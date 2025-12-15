@@ -1,0 +1,149 @@
+# Gotilert configuration example.
+#
+# Notes:
+# - `defaults.severityFromPriority` is REQUIRED and must be non-empty.
+# - `defaults.ttl` is REQUIRED and must be > 0.
+# - App tokens are secrets: do not commit real tokens.
+
+server:
+  # Where Gotilert listens. Keep this internal or behind a reverse proxy.
+  listenAddr: "0.0.0.0:8008"
+
+  # HTTP server timeouts (0 means "use built-in defaults" in Gotilert).
+  readTimeout: "5s"
+  writeTimeout: "10s"
+  idleTimeout: "60s"
+  shutdownTimeout: "10s"
+
+logging:
+  # plain -> fluent-bit-friendly key=value format (no msg= wrapper)
+  # text  -> Go slog text handler
+  # json  -> Go slog JSON handler
+  format: plain
+
+  # debug | info | warn | error
+  # (fatal/panic are accepted but normalized to error)
+  level: info
+
+  # When false, the "time=" field is omitted.
+  includeTime: false
+
+alertmanager:
+  # Alertmanager base URL. Gotilert will POST to: <url>/api/v2/alerts
+  #
+  # Examples:
+  # - url: "https://alertmanager.example.com"
+  # - url: "http://alertmanager.monitoring.svc.cluster.local:9093"
+  url: "http://localhost:9093"
+
+  # Total timeout for upstream calls (including retries + backoff).
+  # Use 0 to disable the extra bounded timeout wrapper and rely on the HTTP client timeout.
+  timeout: "5s"
+
+  tlsConfig:
+    # Set to true only for homelab/self-signed setups.
+    # Prefer proper CA trust in production.
+    insecureSkipVerify: true
+
+  # Authentication to Alertmanager web/API.
+  #
+  # Alertmanager's basic auth expects a browser-style user+password (HTTP Basic),
+  # typically backed by bcrypt-hashed passwords in the Alertmanager config.
+  #
+  # IMPORTANT:
+  # - basicAuth and bearerToken are mutually exclusive.
+  # - Leave both unset if Alertmanager is unauthenticated on your internal network.
+  basicAuth:
+    username: "alertuser"
+    password: "alertpass"
+  # bearerToken: "change-me"
+
+defaults:
+  # Alertname used unless overridden by the app config below.
+  # If empty, Gotilert falls back to "GotilertNotification".
+  alertname: "GotilertNotification"
+
+  # TTL controls when the alert auto-resolves:
+  # - startsAt = now()
+  # - endsAt   = now() + ttl
+  #
+  # TTL must be > 0.
+  # Typical values:
+  # - 5m / 15m for "FYI" messages
+  # - 1h+ if you want longer-lived alerts (be mindful of Alertmanager repeat_interval)
+  ttl: "5m"
+
+  # Default labels applied to every alert.
+  # Tip: set environment to avoid grouping dev/prod together in Alertmanager.
+  labels:
+    source: "gotilert" # useful matcher for Alertmanager routes
+    environment: "dev" # e.g. dev/stage/prod
+    # instance: "gotilert" # OPTIONAL: set if your Alertmanager groups by instance and you want stable grouping
+
+  # Priority -> severity mapping (REQUIRED).
+  #
+  # Behavior:
+  # - Exact match wins.
+  # - If no exact match: use the closest LOWER key; otherwise the smallest key.
+  #
+  # Gotify default priority is 5.
+  severityFromPriority:
+    0: info
+    5: warning
+    10: critical
+
+apps:
+  # Each key is an app token. Requests must authenticate with one of:
+  # - Header:  X-Gotify-Key: <token>
+  # - Query:   ?token=<token>
+  # - Header:  Authorization: Bearer <token>
+
+  "TOKEN_FOR_TRUENAS":
+    # Name shown in labels and used for the computed `app` label.
+    appName: "truenas"
+
+    # Optional: override alertname for this app only.
+    # alertname: "TrueNASNotification"
+
+    # Optional: per-app extra labels.
+    # Merged after defaults.labels.
+    labels:
+      service: "nas"
+      team: "ops"
+
+    # Optional: per-app priority->severity mapping.
+    # When set and non-empty, it overrides defaults.severityFromPriority.
+    # severityFromPriority:
+    #   0: info
+    #   2: warning
+    #   5: critical
+
+  "TOKEN_FOR_BACKUP":
+    appName: "backup"
+
+    # Example of per-app alertname override.
+    # Useful when you want separate Alertmanager grouping/routing rules.
+    alertname: "BackupJobAlert"
+
+    labels:
+      service: "backup"
+      team: "platform"
+
+    # Example of a more aggressive mapping: prioritize critical faster for backups.
+    severityFromPriority:
+      0: info
+      1: warning
+      3: critical
+
+  "TOKEN_FOR_MISC":
+    appName: "misc"
+
+    # This app demonstrates how you can steer Alertmanager routing by labels.
+    labels:
+      service: "misc"
+      team: "platform"
+      severity_hint: "notify-only" # purely custom; Gotilert still sets computed severity label
+
+    # Example: treat everything as "info" for chatty sources
+    severityFromPriority:
+      0: info

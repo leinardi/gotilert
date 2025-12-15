@@ -1,0 +1,39 @@
+services:
+  gotilert:
+    image: ghcr.io/leinardi/gotilert:latest # dclint disable-line service-image-require-explicit-tag
+
+    # Provide config (adjust host path as needed)
+    volumes:
+      - type: bind
+        source: ./gotilert.yaml
+        target: /config/gotilert.yaml
+        read_only: true
+
+    # Publish metrics. In Swarm this uses routing mesh unless you use host-mode elsewhere.
+    ports:
+      - target: 8008
+        published: 8008
+        protocol: tcp
+        mode: ingress
+
+    # Minimal, explicit args. Add any other flags here.
+    command:
+      - --config.file=/config/gotilert.yaml
+      - --log-level=info
+      - --log-format=plain
+
+    restart: unless-stopped
+
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+
+    # Security/operability hardening:
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
