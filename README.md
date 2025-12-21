@@ -3,8 +3,6 @@
 **Gotify-compatible** gateway that forwards notifications to **Prometheus Alertmanager**.
 Use it when a tool supports Gotify (but not Alertmanager) and you still want a single alerting pipeline.
 
----
-
 ## 💡 What is "Gotilert"?
 
 Gotilert exposes a small subset of Gotify's app API (mainly `POST /message`), validates/authenticates the request using an **app token**, then turns
@@ -12,14 +10,10 @@ the message into a **firing Alertmanager alert** (via `/api/v2/alerts`).
 
 It's intentionally small: no users, no Web UI, no message history, just a bridge.
 
----
-
 ## 🪶 Resource usage
 
 Gotilert is designed to be lightweight. In typical Docker deployments it can sit around **~2.5 MiB RAM** when idle (exact usage depends on platform,
 Go version, and container runtime settings).
-
----
 
 ## 📦 What Gotilert Does
 
@@ -49,15 +43,11 @@ Go version, and container runtime settings).
     - Alertmanager deduplicates alerts by their **labels**
     - Gotilert includes a unique `gotilert_id` **label** per incoming message so every `POST /message` becomes a distinct alert
 
----
-
 ## 🔌 Endpoints
 
 - `GET /healthz` → `200 ok`
 - `GET /readyz` → `200 ok` when Gotilert considers itself ready to forward
 - `POST /message` → Gotify-ish JSON response (and forwards to Alertmanager)
-
----
 
 ## 🚀 Quick Start
 
@@ -84,8 +74,6 @@ docker run --rm \
 ### 4) Docker Compose example
 
 See: [`deployments/docker/docker-compose.yaml`](deployments/docker/docker-compose.yaml)
-
----
 
 ## 📨 Send a notification (Gotify-compatible)
 
@@ -114,8 +102,6 @@ Validation rules:
 - `message` is **required**
 - `priority` defaults to `5` if missing and must be `>= 0`
 - `title` is optional
-
----
 
 ## ⚙️ Configuration
 
@@ -160,8 +146,6 @@ Alert name precedence:
 2. `defaults.alertname`
 3. `GotilertNotification` (fallback)
 
----
-
 ## 🔔 Alertmanager routing tips (important)
 
 Alertmanager notification delivery depends on `route.group_by` and timers.
@@ -189,14 +173,10 @@ route:
 
 Tip: set `defaults.labels.environment` (e.g. `prod`) so alert grouping never mixes environments.
 
----
-
 ## ✅ Health & Readiness
 
 - `/healthz` is a basic liveness endpoint.
 - `/readyz` is intended to reflect "can forward" (lightweight readiness check).
-
----
 
 ## 🔐 Security Notes
 
@@ -207,8 +187,6 @@ Tip: set `defaults.labels.environment` (e.g. `prod`) so alert grouping never mix
     - TLS
     - IP allowlists / auth
     - rate limiting
-
----
 
 ## 🤝 Contributing
 
