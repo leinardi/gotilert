@@ -87,6 +87,8 @@ repos:
       - id: golangci-lint-config-verify
       - id: golangci-lint-fmt
       - id: golangci-lint-full
+        types: [file]
+        files: '(\.go$|^go\.(mod|sum)$|^\.golangci\.(yml|yaml|toml|json)$)'
   - repo: https://github.com/tekwizely/pre-commit-golang
     rev: v1.0.0-rc.4
     hooks:
