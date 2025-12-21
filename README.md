@@ -14,6 +14,13 @@ It's intentionally small: no users, no Web UI, no message history, just a bridge
 
 ---
 
+## 🪶 Resource usage
+
+Gotilert is designed to be lightweight. In typical Docker deployments it can sit around **~2.5 MiB RAM** when idle (exact usage depends on platform,
+Go version, and container runtime settings).
+
+---
+
 ## 📦 What Gotilert Does
 
 - Implements **Gotify-ish** API:
@@ -166,7 +173,7 @@ Example:
 ```yaml
 route:
   receiver: ops-default
-  group_by: ['environment', 'alertname', 'instance']
+  group_by: [ 'environment', 'alertname', 'instance' ]
   group_wait: 10s
   group_interval: 2m
   repeat_interval: 4h
@@ -174,7 +181,7 @@ route:
     - receiver: ops-default
       matchers:
         - source="gotilert"
-      group_by: ['gotilert_id']
+      group_by: [ 'gotilert_id' ]
       group_wait: 0s
       group_interval: 10s
       repeat_interval: 24h
