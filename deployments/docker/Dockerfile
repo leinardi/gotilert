@@ -45,7 +45,7 @@ RUN --mount=type=cache,target=/go/pkg/mod,id=gomodcache \
 ########################
 # certs: minimal CA bundle
 ########################
-FROM --platform=$BUILDPLATFORM alpine:3.23.4 AS certs
+FROM --platform=$BUILDPLATFORM alpine:3.24.0 AS certs
 RUN --mount=type=cache,target=/var/cache/apk \
 	apk add --no-cache ca-certificates
 # leave at /etc/ssl/certs/ca-certificates.crt
