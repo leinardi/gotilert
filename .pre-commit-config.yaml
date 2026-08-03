@@ -27,7 +27,7 @@ repos:
         args: ["-oneline", "-shellcheck", "shellcheck -S error"]
         stages: [manual]
   - repo: https://github.com/DavidAnson/markdownlint-cli2
-    rev: v0.23.1
+    rev: v0.23.2
     hooks:
       - id: markdownlint-cli2
   - repo: local
@@ -78,7 +78,7 @@ repos:
         files: ^(?:.*/)?(?:docker-)?compose\.ya?ml$
         args: [--fix]
   - repo: https://github.com/hadolint/hadolint
-    rev: v2.14.0
+    rev: v2.15.0
     hooks:
       - id: hadolint
   - repo: https://github.com/golangci/golangci-lint
