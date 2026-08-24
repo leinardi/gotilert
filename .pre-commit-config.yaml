@@ -78,11 +78,11 @@ repos:
         files: ^(?:.*/)?(?:docker-)?compose\.ya?ml$
         args: [--fix]
   - repo: https://github.com/hadolint/hadolint
-    rev: v2.15.0
+    rev: v2.15.1
     hooks:
       - id: hadolint
   - repo: https://github.com/golangci/golangci-lint
-    rev: v2.12.2
+    rev: v2.13.1
     hooks:
       - id: golangci-lint-config-verify
       - id: golangci-lint-fmt
