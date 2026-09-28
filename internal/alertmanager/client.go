@@ -270,6 +270,14 @@ func shouldRetry(err error) bool {
 		return false
 	}
 
+	// A timed-out attempt: the HTTP client's own Timeout, reported as a *url.Error. It also
+	// matches context.DeadlineExceeded, so it is checked first. The caller's context ending
+	// never gets here: PostAlerts stops on ctx.Err() before asking.
+	urlErr, isURLError := errors.AsType[*url.Error](err)
+	if isURLError && urlErr.Timeout() {
+		return true
+	}
+
 	// Never retry caller-driven cancellations/deadlines.
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return false
