@@ -35,7 +35,10 @@ import (
 func TestParseMessageRequestJSONDefaultsPriority(t *testing.T) {
 	t.Parallel()
 
-	req := httptest.NewRequest(http.MethodPost, "http://example.local/message",
+	req := httptest.NewRequestWithContext(
+		t.Context(),
+		http.MethodPost,
+		"http://example.local/message",
 		strings.NewReader(`{"message":"hello"}`),
 	)
 	req.Header.Set("Content-Type", "application/json")
@@ -61,7 +64,10 @@ func TestParseMessageRequestJSONDefaultsPriority(t *testing.T) {
 func TestParseMessageRequestJSONMissingMessage(t *testing.T) {
 	t.Parallel()
 
-	req := httptest.NewRequest(http.MethodPost, "http://example.local/message",
+	req := httptest.NewRequestWithContext(
+		t.Context(),
+		http.MethodPost,
+		"http://example.local/message",
 		strings.NewReader(`{"title":"t"}`),
 	)
 	req.Header.Set("Content-Type", "application/json")
@@ -75,7 +81,10 @@ func TestParseMessageRequestJSONMissingMessage(t *testing.T) {
 func TestParseMessageRequestForm(t *testing.T) {
 	t.Parallel()
 
-	req := httptest.NewRequest(http.MethodPost, "http://example.local/message",
+	req := httptest.NewRequestWithContext(
+		t.Context(),
+		http.MethodPost,
+		"http://example.local/message",
 		strings.NewReader("message=hello&title=test&priority=7"),
 	)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -101,7 +110,10 @@ func TestParseMessageRequestForm(t *testing.T) {
 func TestParseMessageRequestUnsupportedContentType(t *testing.T) {
 	t.Parallel()
 
-	req := httptest.NewRequest(http.MethodPost, "http://example.local/message",
+	req := httptest.NewRequestWithContext(
+		t.Context(),
+		http.MethodPost,
+		"http://example.local/message",
 		strings.NewReader("message=hello"),
 	)
 	req.Header.Set("Content-Type", "text/plain")
@@ -115,7 +127,8 @@ func TestParseMessageRequestUnsupportedContentType(t *testing.T) {
 func TestParseMessageRequestJSONNegativePriority(t *testing.T) {
 	t.Parallel()
 
-	request := httptest.NewRequest(
+	request := httptest.NewRequestWithContext(
+		t.Context(),
 		http.MethodPost,
 		"http://example.local/message",
 		strings.NewReader(`{"message":"hello","priority":-1}`),
@@ -131,7 +144,8 @@ func TestParseMessageRequestJSONNegativePriority(t *testing.T) {
 func TestParseMessageRequestFormNegativePriority(t *testing.T) {
 	t.Parallel()
 
-	request := httptest.NewRequest(
+	request := httptest.NewRequestWithContext(
+		t.Context(),
 		http.MethodPost,
 		"http://example.local/message",
 		strings.NewReader("message=hello&priority=-1"),

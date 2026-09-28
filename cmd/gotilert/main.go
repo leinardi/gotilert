@@ -305,8 +305,7 @@ func newForwarder(
 				"upstream", cfg.Alertmanager.URL,
 			}
 
-			var stErr alertmanager.HTTPStatusError
-			if errors.As(postErr, &stErr) {
+			if stErr, ok := errors.AsType[alertmanager.HTTPStatusError](postErr); ok {
 				logArgs = append(logArgs,
 					"upstream_status", stErr.StatusCode(),
 					"upstream_body", stErr.Body(),

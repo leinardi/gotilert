@@ -47,7 +47,8 @@ func TestAuthTokenPrecedenceHeaderWins(t *testing.T) {
 	})
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(
+	req := httptest.NewRequestWithContext(
+		t.Context(),
 		http.MethodPost,
 		"http://example.local/message?token=QUERY",
 		bytes.NewReader(mustJSON(t, gotify.MessageRequest{Message: "hello"})),
@@ -72,7 +73,8 @@ func TestAuthTokenPrecedenceQuerySecond(t *testing.T) {
 	})
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(
+	req := httptest.NewRequestWithContext(
+		t.Context(),
 		http.MethodPost,
 		"http://example.local/message?token=QUERY",
 		bytes.NewReader(mustJSON(t, gotify.MessageRequest{Message: "hello"})),
@@ -95,7 +97,8 @@ func TestAuthTokenPrecedenceBearerLast(t *testing.T) {
 	})
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(
+	req := httptest.NewRequestWithContext(
+		t.Context(),
 		http.MethodPost,
 		"http://example.local/message",
 		bytes.NewReader(mustJSON(t, gotify.MessageRequest{Message: "hello"})),
@@ -118,7 +121,8 @@ func TestAuthUnknownTokenForbidden(t *testing.T) {
 	})
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(
+	req := httptest.NewRequestWithContext(
+		t.Context(),
 		http.MethodPost,
 		"http://example.local/message",
 		bytes.NewReader(mustJSON(t, gotify.MessageRequest{Message: "hello"})),
