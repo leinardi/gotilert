@@ -43,6 +43,10 @@ const (
 	readyzPath  = "/readyz"
 	messagePath = "/message"
 
+	// Label values for a request that matched no route, or used a non-standard method.
+	unmatchedRoute = "unmatched"
+	otherMethod    = "OTHER"
+
 	okBody = "ok\n"
 )
 
@@ -206,6 +210,30 @@ func (recorder *statusRecorder) WriteHeader(code int) {
 	recorder.ResponseWriter.WriteHeader(code)
 }
 
+// routeLabel is the path label a request is counted under: the ServeMux pattern it
+// matched, which the mux sets on this same request, or unmatchedRoute. Never the
+// raw path: any client can send any path, and every distinct label value is a new
+// series kept for the life of the process.
+func routeLabel(request *http.Request) string {
+	if request.Pattern == "" {
+		return unmatchedRoute
+	}
+
+	return request.Pattern
+}
+
+// methodLabel is the method label a request is counted under: a standard method,
+// or otherMethod, since a client can send any token as the method.
+func methodLabel(method string) string {
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodPatch,
+		http.MethodDelete, http.MethodConnect, http.MethodOptions, http.MethodTrace:
+		return method
+	default:
+		return otherMethod
+	}
+}
+
 func withRequestLogging(metricsCollector *metrics.Metrics, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(responseWriter http.ResponseWriter, request *http.Request) {
 		start := time.Now()
@@ -227,10 +255,9 @@ func withRequestLogging(metricsCollector *metrics.Metrics, next http.Handler) ht
 		)
 
 		if metricsCollector != nil {
-			// Path cardinality is low (fixed endpoints).
 			metricsCollector.ObserveRequest(
-				request.Method,
-				request.URL.Path,
+				methodLabel(request.Method),
+				routeLabel(request),
 				recorder.status,
 				duration,
 			)
