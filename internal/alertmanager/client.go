@@ -118,7 +118,7 @@ func New(opts *Options) (*Client, error) {
 		timeout = defaultHTTPTimeout
 	}
 
-	tlsConfig := &tls.Config{} //nolint:gosec // user-configured option; explicitly supported for self-signed homelab setups.
+	tlsConfig := &tls.Config{}
 	tlsConfig.InsecureSkipVerify = opts.InsecureSkipVerify
 
 	baseTransport, ok := http.DefaultTransport.(*http.Transport)
@@ -270,6 +270,14 @@ func shouldRetry(err error) bool {
 		return false
 	}
 
+	// A timed-out attempt: the HTTP client's own Timeout, reported as a *url.Error. It also
+	// matches context.DeadlineExceeded, so it is checked first. The caller's context ending
+	// never gets here: PostAlerts stops on ctx.Err() before asking.
+	urlErr, isURLError := errors.AsType[*url.Error](err)
+	if isURLError && urlErr.Timeout() {
+		return true
+	}
+
 	// Never retry caller-driven cancellations/deadlines.
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return false
@@ -281,8 +289,7 @@ func shouldRetry(err error) bool {
 	}
 
 	// Retry on upstream status codes: 429 + 5xx.
-	var statusErr *statusError
-	if errors.As(err, &statusErr) {
+	if statusErr, ok := errors.AsType[*statusError](err); ok {
 		code := statusErr.StatusCode()
 		if code == http.StatusTooManyRequests {
 			return true
@@ -311,23 +318,19 @@ func shouldRetry(err error) bool {
 
 func isPermanentTLSError(err error) bool {
 	// x509 verification failures are permanent unless config/certs change.
-	var unknownAuthorityErr x509.UnknownAuthorityError
-	if errors.As(err, &unknownAuthorityErr) {
+	if _, ok := errors.AsType[x509.UnknownAuthorityError](err); ok {
 		return true
 	}
 
-	var hostnameErr x509.HostnameError
-	if errors.As(err, &hostnameErr) {
+	if _, ok := errors.AsType[x509.HostnameError](err); ok {
 		return true
 	}
 
-	var certificateInvalidErr x509.CertificateInvalidError
-	if errors.As(err, &certificateInvalidErr) {
+	if _, ok := errors.AsType[x509.CertificateInvalidError](err); ok {
 		return true
 	}
 
-	var systemRootsErr x509.SystemRootsError
-	if errors.As(err, &systemRootsErr) {
+	if _, ok := errors.AsType[x509.SystemRootsError](err); ok {
 		return true
 	}
 

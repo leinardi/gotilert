@@ -30,6 +30,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -158,6 +159,57 @@ func TestPostAlertsRetriesOn500AndEventuallySucceeds(t *testing.T) {
 
 	if gotCount := requestCount.Load(); gotCount != 3 {
 		t.Fatalf("expected 3 attempts, got %d", gotCount)
+	}
+}
+
+// A per-attempt timeout (the HTTP client's Timeout) is a transient failure the README promises to
+// retry; only the caller's own context ending stops the retries.
+func TestPostAlertsRetriesAfterAttemptTimeout(t *testing.T) {
+	t.Parallel()
+
+	var requestCount atomic.Int32
+
+	upstream := httptest.NewServer(
+		http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			// The first attempt hangs until the client gives up on it; the second succeeds.
+			// The server only notices the client going away once the body is read.
+			if requestCount.Add(1) == 1 {
+				_, _ = io.Copy(io.Discard, request.Body)
+
+				<-request.Context().Done()
+
+				return
+			}
+
+			writer.WriteHeader(http.StatusOK)
+		}),
+	)
+	defer upstream.Close()
+
+	client, err := alertmanager.New(&alertmanager.Options{
+		BaseURL: upstream.URL,
+		Timeout: 100 * time.Millisecond,
+	})
+	if err != nil {
+		t.Fatalf("alertmanager.New: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+
+	postErr := client.PostAlerts(ctx, []alertmanager.Alert{
+		{
+			Labels:   map[string]string{"alertname": "Test"},
+			StartsAt: time.Now().UTC(),
+			EndsAt:   time.Now().UTC().Add(1 * time.Minute),
+		},
+	})
+	if postErr != nil {
+		t.Fatalf("PostAlerts: expected success after a timed-out attempt, got %v", postErr)
+	}
+
+	if gotCount := requestCount.Load(); gotCount != 2 {
+		t.Fatalf("expected 2 attempts, got %d", gotCount)
 	}
 }
 

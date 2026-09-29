@@ -1,8 +1,6 @@
 module github.com/leinardi/gotilert
 
-go 1.25.0
-
-toolchain go1.25.2
+go 1.26.8
 
 require (
 	github.com/prometheus/client_golang v1.24.1

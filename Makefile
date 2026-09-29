@@ -10,7 +10,7 @@ MK_COMMON_DIR         := $(REPO_ROOT)/.mk
 MK_COMMON_FILES       := docker.mk help.mk go.mk password.mk pre-commit.mk
 
 # Repo-local snippets that are NOT in make-common
-MK_LOCAL_FILES        := docker-run.mk
+MK_LOCAL_FILES        := docker-run.mk audit-deps.mk
 
 MK_COMMON_BOOTSTRAP_SCRIPT := $(REPO_ROOT)/scripts/bootstrap-mk-common.sh
 
@@ -59,3 +59,12 @@ mk-common-update: ## Check for remote updates of shared .mk files
 	  "$(MK_COMMON_VERSION)" \
 	  "$(MK_COMMON_DIR)" \
 	  "$(MK_COMMON_FILES)"
+
+# -----------------------------------------------------------------------------
+# Adding new targets
+# -----------------------------------------------------------------------------
+# Do NOT add recipes directly to this file. Instead:
+#   - Project-specific targets -> new .mk/<fragment>.mk added to MK_LOCAL_FILES
+#   - Generic targets (useful beyond this repo) -> new or updated .mk/<fragment>.mk
+#     added to MK_COMMON_FILES, then open a PR to port the change upstream at
+#     https://github.com/leinardi/make-common so mk-common-update keeps working.

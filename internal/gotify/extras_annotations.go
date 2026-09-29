@@ -62,7 +62,12 @@ func ExtrasAnnotations(extras map[string]any) map[string]string {
 	}
 
 	// android::action.onReceive.intentUrl
-	if intentURL, ok := extrasStringAtPath(extras, "android::action", "onReceive", "intentUrl"); ok {
+	if intentURL, ok := extrasStringAtPath(
+		extras,
+		"android::action",
+		"onReceive",
+		"intentUrl",
+	); ok {
 		annotations[AnnotationGotifyOnReceiveIntentURL] = intentURL
 	}
 

@@ -9,6 +9,10 @@ on:
       - .pre-commit-config.yaml
   workflow_dispatch:
 
+# The reusable workflow only checks out and fills the cache; it declares the same.
+permissions:
+  contents: read
+
 jobs:
   warm-pre-commit-cache:
-    uses: leinardi/gh-reusable-workflows/.github/workflows/pre-commit-warmup.yaml@v1
+    uses: leinardi/gh-reusable-workflows/.github/workflows/pre-commit-warmup.yaml@8d4a35da814b86f98aad1335e73bbf67186e0668 # v1.3.0

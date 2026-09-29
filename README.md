@@ -190,8 +190,5 @@ Tip: set `defaults.labels.environment` (e.g. `prod`) so alert grouping never mix
 
 ## 🤝 Contributing
 
-PRs and issues are welcome.
-
-Suggested local checks:
-
-- `make check`
+PRs and issues are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Report vulnerabilities privately, as described in
+[SECURITY.md](SECURITY.md). How a release is cut, and how to verify one, is in [docs/release.md](docs/release.md).
