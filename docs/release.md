@@ -117,8 +117,8 @@ A **fresh** release then runs these steps. They are numbered because the other m
 
 1. Start a registry inside the job (`registry:3.1.2`, pinned by digest) and give Buildx the host network, so it can push there.
 2. **Build the image once**, for both platforms, with the SBOM and `mode=max` provenance, pushed by digest to that local registry.
-   There is no other image build: what is scanned is what is published. Every layer is recompressed as gzip, because a base image
-   may ship zstd layers, and for a zstd image skopeo rewrites the index entries with a compression annotation, which the
+   There is no other image build: what is scanned is what is published. Every layer is recompressed as gzip, because the `dhi.io`
+   base layers are zstd, and for a zstd image skopeo rewrites the index entries with a compression annotation, which the
    digest-preserving copy in step 7 then refuses.
 3. **Scan** both platform images, each by its own digest, with
    `trivy image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 --platform <platform> <image>@<digest>`. A finding fails
@@ -291,7 +291,24 @@ that references a missing environment creates it with no protection rules.
 1. **Restrict it to `main`** with a deployment branch rule, as a server-side second line of defence behind the `guard` job.
    Add required reviewers too if a release should wait for a human. Leave the "Immutable tags" ruleset exactly as it is; the
    release job is written for it.
-2. Run a **dry run** to check the environment works.
+2. **Give it the `dhi.io` credentials**: the image's build stage pulls `dhi.io/golang`, so the job needs the `DHI_TOKEN` secret and
+   the `DHI_USERNAME` variable. Add both **to the environment**, not to the repository, so only a job that passed the environment's
+   rules can read them:
+
+   ```bash
+   gh secret set DHI_TOKEN --env release
+   gh variable set DHI_USERNAME --env release --body '<username>'
+   ```
+
+3. Run a **dry run** to check the environment works.
+
+Dependabot does not see Actions secrets. To update the digest-pinned `dhi.io` base images it needs its own copy of the token, which
+the `dhi` registry in [`.github/dependabot.yml`](../.github/dependabot.yml) reads. Add it once, from a shell where you can paste the
+token:
+
+```bash
+gh secret set DHI_TOKEN -a dependabot
+```
 
 ### Required checks
 

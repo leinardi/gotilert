@@ -1,25 +1,17 @@
-# syntax=docker/dockerfile:1.7
+# syntax=docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
 
+# The syntax line above pins the BuildKit frontend by index digest, so a moved
+# 1.7 tag cannot change how this file is built. Dependabot's docker ecosystem
+# does not update it: bump it by hand (docs/release.md).
+#
 # Every base image is pinned by index digest: the release scans the image it
 # builds and a recovery re-run rebuilds it, so a tag that moved in between would
 # ship something nobody scanned. Dependabot bumps the tag and the digest together.
 
 ########################
-# deps: cache modules
-########################
-FROM --platform=$BUILDPLATFORM golang:1.27.1-alpine@sha256:8a5910f31396cd4d89662f56c68b3ae31d374308270a1c3bd96672ee5ed43414 AS deps
-WORKDIR /src
-RUN --mount=type=cache,target=/var/cache/apk \
-	apk add --no-cache ca-certificates git
-COPY go.mod go.sum ./
-# Use a named cache so we can reuse it in the build stage (no COPY needed)
-RUN --mount=type=cache,target=/go/pkg/mod,id=gomodcache \
-	go mod download
-
-########################
 # build: compile static binary
 ########################
-FROM --platform=$BUILDPLATFORM golang:1.27.1-alpine@sha256:8a5910f31396cd4d89662f56c68b3ae31d374308270a1c3bd96672ee5ed43414 AS build
+FROM --platform=$BUILDPLATFORM dhi.io/golang:1.27.1-alpine3.23-dev@sha256:ab0da7884e1e7960d971aa371a4fd7c3ffd9b9e2e90bf0fbcedd4cc954d7d4cd AS build
 ARG VERSION="dev"
 ARG COMMIT="none"
 ARG DATE="unknown"
@@ -33,13 +25,11 @@ ENV CGO_ENABLED=0 \
     GOARCH=${TARGETARCH}
 
 WORKDIR /src
-RUN --mount=type=cache,target=/var/cache/apk \
-	apk add --no-cache ca-certificates
 
 # Bring in source
 COPY . .
 
-# Reuse the same module & build caches (BuildKit)
+# Module and build caches (BuildKit)
 RUN --mount=type=cache,target=/go/pkg/mod,id=gomodcache \
 	--mount=type=cache,target=/root/.cache/go-build \
 	go build -trimpath -buildvcs=false \
@@ -47,17 +37,11 @@ RUN --mount=type=cache,target=/go/pkg/mod,id=gomodcache \
 		-o /out/gotilert ./cmd/gotilert
 
 ########################
-# certs: minimal CA bundle
+# runtime: dhi.io hardened static base (distroless-style, no shell).
+# The binary is CGO_ENABLED=0 so no libc is required. The base ships the CA
+# bundle at /etc/ssl/certs/ca-certificates.crt, which HTTPS to Alertmanager needs.
 ########################
-FROM --platform=$BUILDPLATFORM alpine:3.24.1@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b AS certs
-RUN --mount=type=cache,target=/var/cache/apk \
-	apk add --no-cache ca-certificates
-# leave at /etc/ssl/certs/ca-certificates.crt
-
-########################
-# runtime: distroless static nonroot
-########################
-FROM gcr.io/distroless/static:nonroot@sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3
+FROM dhi.io/static:20250419@sha256:98ef7a853608577e8d66dad1d25ada75d745d782f28d84e9ecfb85dfeb1f9c98
 
 # hadolint ignore=DL3050
 LABEL org.opencontainers.image.title="gotilert" \
@@ -65,15 +49,15 @@ LABEL org.opencontainers.image.title="gotilert" \
 	org.opencontainers.image.source="https://github.com/leinardi/gotilert" \
 	org.opencontainers.image.licenses="MIT"
 
-# Copy the binary and CA bundle
+# Copy the binary
 COPY --from=build /out/gotilert /usr/local/bin/gotilert
-COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
-# Run as non-root (UID/GID 65532 in distroless)
-USER nonroot:nonroot
+# Run as a fixed non-root user; the gateway does not need root. The uid is pinned here rather
+# than inherited from the base image's default (65532 today), so a base update cannot change it.
+USER 65532:65532
 
-# Document the metrics port (no EXPOSE required for security, but okay to include)
+# Document the listen port
 EXPOSE 8008
 
-# Distroless has no shell; use absolute path
+# The base has no shell; use absolute path
 ENTRYPOINT ["/usr/local/bin/gotilert"]
