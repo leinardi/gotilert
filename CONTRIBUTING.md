@@ -16,6 +16,9 @@ make audit-deps    # govulncheck over every package (network required)
 make docker-build  # the container image, for the host's architecture
 ```
 
+The image is built on [Docker Hardened Images](https://docs.docker.com/dhi/), so `make docker-build` needs a `docker login dhi.io`
+first, with a Docker account that has access to them.
+
 ## Linting
 
 ```bash
