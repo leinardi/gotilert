@@ -1,10 +1,12 @@
 ---
 name: go-style-guide
 description: >
-  Project Go style rules enforced by golangci-lint v2 (all linters) + pre-commit,
-  plus this gateway's own patterns (logging, context and timeouts, HTTP handlers,
-  metrics). Apply when writing, editing, or reviewing any .go file in this repo.
-  Consult before generating Go code, not after lint fails.
+  Go coding rules for gotilert: the golangci-lint v2 (default: all) settings and
+  how to satisfy them (noinlineerr, err113, nolintlint, mnd, varnamelen,
+  modernize), the helpers to reuse, and the gateway's own logging, context and
+  timeout, HTTP handler and Prometheus metric patterns. Use when writing, editing
+  or reviewing any .go file in gotilert — consult it before generating Go code,
+  not after lint fails.
 ---
 
 # Go Style Guide — gotilert
@@ -34,28 +36,10 @@ The formatters (`gci`, `gofmt`, `gofumpt`, `goimports`, `golines`) run in the
 
 ## 1. Import grouping
 
-Three groups, separated by blank lines — enforced by both `gci` (explicit
-`sections: standard, default, prefix(github.com/leinardi/gotilert)`) and `goimports`
-(`local-prefixes: github.com/leinardi/gotilert`) simultaneously, and they must agree.
-`internal/server/message.go` has stdlib and local; third-party (e.g.
-`github.com/prometheus/client_golang/prometheus` in `internal/metrics`) goes between them:
-
-```go
-import (
-    "encoding/json"
-    "errors"
-    "fmt"
-    "net/http"
-    "strings"
-    "sync/atomic"
-    "time"
-
-    "github.com/leinardi/gotilert/internal/gotify"
-    "github.com/leinardi/gotilert/internal/logger"
-)
-```
-
-Within each group imports are sorted alphabetically; no blank lines within a group.
+Three groups separated by blank lines — stdlib, third-party, then local
+`github.com/leinardi/gotilert/...` — alphabetical within each group. `gci` and `goimports`
+both enforce it and the `golangci-lint-fmt` hook rewrites it, so there is nothing to do by
+hand beyond not fighting the formatter.
 
 ---
 
@@ -89,7 +73,7 @@ if err != nil {
 ```
 
 The prefix is a short, lowercase phrase naming the operation, not a full sentence: no
-capital letters, no trailing period. Compare with `errors.Is`/`errors.As` (or Go 1.26's
+capital letters, no trailing period. Compare with `errors.Is`/`errors.As` (or the generic
 `errors.AsType[T]`, used throughout `shouldRetry`), never `==` on error values. Prefer
 flat code with early returns; no `else` after a `return` (`revive`'s `indent-error-flow`).
 
@@ -111,8 +95,8 @@ structured data, implement `error` on a private struct and expose an interface, 
 
 ### 2d. Aggregating multiple errors
 
-Use `errors.Join` over a slice of wrapped errors. `config.Validate` returns the first
-violation instead; keep one style per function.
+Default: `errors.Join` over a slice of wrapped errors. The exception is `config.Validate`,
+which returns at the first invalid section.
 
 ### 2e. Ignoring errors explicitly
 
@@ -266,8 +250,8 @@ The codebase leans long: `responseWriter`, `messageIdentifier`, `metricsCollecto
 
 The `modernize` linter (`newexpr` check) flags any function whose sole purpose is to return
 a pointer to its argument — the generic `func ptr[T any](v T) *T` included — at the
-declaration and at every call site. Go 1.26's `new` takes an expression: write
-`new(true)` or `new(int64(5))`. Taking the address of a local is fine too.
+declaration and at every call site. The Go version in `go.mod` lets `new` take an
+expression: write `new(true)` or `new(int64(5))`. Taking the address of a local is fine too.
 
 ---
 
@@ -320,13 +304,12 @@ The same rule makes `//nolint` explanations useful: say why the fix does not app
 
 ## 18. Waiting in tests: classify before you write a sleep
 
-There are no `time.Sleep` calls in this repo's tests today; the tests call handlers and the
-client synchronously against `httptest` servers and count requests with `atomic.Int32`. Keep it
-that way. If a test ever has to wait, decide the class first:
+Tests call handlers and the client synchronously against `httptest` servers and count
+requests with `atomic.Int32`; they do not sleep. If a test has to wait, decide the class first:
 
 - **Positive eventual — never a sleep.** Wait on a channel or poll with a deadline and fail
-  naming what never happened. There is no shared helper yet: add one when the first site
-  needs it, not speculatively.
+  naming what never happened. Before writing a polling helper, check the test packages for an
+  existing one; add a shared helper only when a second site needs it.
 - **Negative assertion — bounded and commented.** Give the wrong behavior a bounded window,
   assert it did not appear, and say in a comment that this is what the wait is.
 - **Real elapsed window — the duration is the point.** A backoff step. Name it as a constant
@@ -413,8 +396,8 @@ gotilert/
 
 - All metrics live in `internal/metrics` on a private `prometheus.Registry`, registered
   explicitly in `metrics.New()` (no `init()`), exposed with `promhttp.HandlerFor`.
-- Names are `gotilert_…`; a rename or a label change breaks dashboards (see the
-  `adversarial-review` invariants).
+- Names are `gotilert_…`; a rename or a label change breaks dashboards (see the *Metrics are
+  a public contract* invariant in `adversarial-review`).
 - Label values come from bounded sets only: app names from the config, route patterns
   (`routeLabel`), standard methods (`methodLabel`), status codes.
 - The recording methods on `*Metrics` return early on a nil receiver, so callers need no
@@ -455,3 +438,11 @@ gotilert/
 - [ ] No token or credential reaches a log line or an error message
 - [ ] Every outbound call bounded by a deadline; retry waits honor `ctx`
 - [ ] Metric labels from bounded values only; any metric change reflected in the docs
+
+## Lint and test loop
+
+1. Run `pre-commit run golangci-lint-fmt --files <changed .go files>` and
+   `pre-commit run golangci-lint-full --files <changed .go files>` (or `--all-files`).
+2. Run `make go-vet` and `make go-test`.
+3. Fix each report and re-run from step 1 until all of them are clean.
+4. Check `git status`: the formatter hook rewrites files in place, so review and keep its changes.
