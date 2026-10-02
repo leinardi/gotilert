@@ -1,15 +1,15 @@
 ---
 name: adversarial-review
 description: >
-  Adversarial code review of a set of changes to this repo — working tree, staged
-  diff, a branch vs main, a commit range, or a PR. Language-agnostic (Go, bash,
-  Dockerfile, Makefile, YAML, docs). Loads go-style-guide for Go paths, hunts for real
-  defects and violations of this gateway's invariants (every message authenticated,
-  tokens never leaked, bounded forwarding to Alertmanager, config fails closed, metrics
-  and the Gotify API as public contracts), then reports ranked findings. Use whenever
-  the user asks to review changes/a diff/a PR/a branch, "check my work before
-  committing", "is this ready to merge", or "poke holes in this" — even if they don't
-  name a language or say the word "review".
+  Adversarial code review of changes to gotilert — working tree, staged diff, a
+  branch vs main, a commit range, or a PR — in any language (Go, bash, Dockerfile,
+  Makefile, YAML, docs). Loads go-style-guide for Go paths, hunts for real defects
+  and violations of the gateway's invariants (every message authenticated, tokens
+  never leaked, bounded forwarding to Alertmanager, config fails closed, metrics and
+  the Gotify API as public contracts), then reports ranked findings with a verdict.
+  Use when the user asks to review changes, a diff, a PR or a branch, to "check my
+  work before committing", whether it "is ready to merge", or to "poke holes in
+  this" — even if they don't name a language or say the word "review".
 ---
 
 # Adversarial Review — gotilert
@@ -19,16 +19,25 @@ bug, breaks an invariant, or drifts from a contract. Your job is to find the spe
 input, state, or path where it fails — not to praise it, not to restyle it. A review that
 finds nothing is only credible after you have actively tried to break the code and failed.
 
-This skill is the **entry point for reviewing any change in this repo, in any language**.
-It does not replace the domain skills — it routes to them. The domain skills own the rules;
-this skill owns the mindset, the routing, and the report.
+Copy this checklist and tick items as you go:
+
+```text
+Review progress:
+- [ ] 1. Scope chosen; diff, stated intent and every changed file read in full
+- [ ] 2. `go-style-guide` loaded for the Go paths
+- [ ] 3. Repo invariants checked
+- [ ] 4. Adversarial passes run; every candidate confirmed or dropped
+- [ ] 5. Always-on passes (a)–(e) run
+- [ ] 6. Gates run; `git status` checked for hook rewrites; skipped gates marked unverified
+- [ ] 7. Report written: findings, open questions, verdict, gates run and not run
+```
 
 ---
 
 ## 1. Establish the diff (what am I reviewing?)
 
 Never review from memory or from the user's description of the change — read the actual
-diff. Pick the scope from what the user said, defaulting to the most useful:
+diff. Pick the scope from what the user said:
 
 | User intent | Command |
 | --- | --- |
@@ -38,6 +47,9 @@ diff. Pick the scope from what the user said, defaulting to the most useful:
 | a specific commit range | `git diff <base>..<head>` |
 | a GitHub PR number | `gh pr view <n>` for intent, then `gh pr diff <n>` |
 
+If the user names no scope, review the uncommitted work (first row); if the tree is
+clean, review the branch against `main` (third row).
+
 Also read `git log --oneline` for the range and any linked issue/PR body — the stated
 **intent** is what you check the code against. A change that works but does something other
 than what it claims is a finding.
@@ -46,18 +58,12 @@ Read every changed file in full, not just the hunks. For non-trivial changes, al
 callers, implementations, tests and docs of what changed — found with a reference search, not
 assumed from the diff: a signature or behavior change is only safe if every call site agrees.
 
-## 2. Route to the domain skills (path → authority)
+## 2. Load the domain skill
 
-For each changed path, load the matching skill **before** judging that file — violations
-there are findings even when lint is green. Load only what the diff touches.
-
-| Changed path | Load skill | It owns |
-| --- | --- | --- |
-| any `**/*.go` | `go-style-guide` | style/lint rules golangci-lint enforces, the helpers to reuse, logging, timeouts, handlers and metrics |
-
-No skill matches (Dockerfile, compose, `Makefile`, `.mk/*.mk`, workflows, other YAML, bash,
-Markdown)? Fall back to §4 plus the invariants in §3. **Same rigor** — an unmatched language
-is not a lighter review.
+For any `**/*.go` path, load `go-style-guide` before judging it; its rules are findings even
+when lint is green. Every other path (Dockerfile, compose, `Makefile`, `.mk/*.mk`, workflows,
+other YAML, bash, Markdown) gets the passes in §4 plus the invariants in §3 with the **same
+rigor** — an unmatched language is not a lighter review.
 
 ## 3. Repo invariants — check these on every review, whatever changed
 
@@ -109,10 +115,11 @@ misconfigured) change only deliberately, with the README.
   `withBoundedTimeout(ctx, alertmanager.timeout)`, the readiness probe by
   `defaultReadyTimeout` (2 s). An upstream error body is read through
   `io.LimitReader(…, maxErrorBodyBytes)` (64 KiB).
-- Known gap: an `http.Client.Timeout` error also matches `context.DeadlineExceeded`, so
-  `shouldRetry` treats a per-attempt timeout as permanent, although the README promises
-  retries on timeouts; `TestShouldRetryTimeoutTrue` uses a synthetic `net.Error` and does not
-  catch it. A change to retry or timeouts must be tested against a slow `httptest` server.
+- A per-attempt `http.Client.Timeout` error is a `*url.Error` that also matches
+  `context.DeadlineExceeded`, so `shouldRetry` checks it first and retries it, as the README
+  promises. Reordering those checks turns per-attempt timeouts into permanent failures. A
+  change to retry or timeouts is tested against a slow `httptest` server, as
+  `TestPostAlertsRetriesAfterAttemptTimeout` does; a synthetic `net.Error` does not catch it.
 - A failed forward is logged with the upstream status and body and counted in
   `gotilert_upstream_failures_total`; the client gets `502` with the generic
   `ErrUpstreamFailed`, never the upstream response.
@@ -184,31 +191,16 @@ is a cardinality finding.
 - Trivy exceptions live only in `.trivyignore`, each with a reason and an `exp:` date.
 - Every workflow starts at `permissions: contents: read`; a job asks for more only with a
   comment saying why. Actions are pinned to a full commit SHA, images to a digest.
-- Commits are Conventional Commits with a scope (`conventional-pre-commit --force-scope`); the
-  type decides the release bump.
+- The commit type decides the release bump (`svu`): check that it matches whether the change
+  should ship.
 
 ## 4. Adversarial passes — language-agnostic
 
 Do not skim for style. Run these passes, each with a "how would I make this fail" framing:
 
-- **Correctness / logic**: off-by-one, inverted conditions (`<` vs `<=`), wrong operator
-  precedence, negated guards, early returns that skip cleanup, copy-paste that kept the old
-  variable. Trace one concrete failing input end to end rather than asserting "looks fine".
-- **Boundaries & nil/empty**: empty slice/map/string, zero, negative, missing key, `nil`
-  receiver/pointer, unset optional, first/last element, single-element collection, nil and
-  empty treated as the same thing where they mean different things.
-- **Aliasing**: a returned slice or map that shares its backing store with internal state, so
-  a caller's write changes it; an `append` onto a slice another owner still holds.
-- **Errors**: swallowed errors, `err` checked then ignored, wrapped-but-not-returned, `%v`
-  where `%w` was needed so `errors.Is`/`errors.As` stop matching, wrong sentinel, panics on
-  attacker- or user-controlled input, partial writes left on the error path.
-- **Concurrency**: shared state without a lock, lock held across I/O or a channel op, goroutine
-  leak, context not honored, map written from two goroutines, TOCTOU between check and use.
-- **Resources**: unclosed file/conn/response body, an ignored `Close` error on a write, missing
-  `defer`, context/timer leak, unbounded growth, work inside a loop that belongs outside it.
-- **Security**: input reaching a command/path/query/HTML without validation, authz check
-  missing or after the effect, secret in a log or response, unsafe deserialization, missing
-  rate/size limits.
+- **Generic passes**: correctness and logic, boundaries and nil/empty, aliasing, error
+  handling, concurrency, resources and security. For each, name one concrete failing input and
+  trace it end to end rather than asserting "looks fine".
 - **Contract drift**: does the code do what the commit message / PR / issue claims? A public
   signature, flag, config key, label, annotation, endpoint, status code or error text changed
   without updating every consumer and the docs (§5 (e)).
@@ -217,8 +209,13 @@ Do not skim for style. Run these passes, each with a "how would I make this fail
   behavior they produced, or that was weakened/deleted to make the change pass — all findings.
   A bug fix with no regression test is a gap worth flagging.
 
-Prefer one confirmed, reproducible defect over ten vague "consider"s. If you cannot name the
-input and the resulting wrong behavior, it is not yet a finding — keep digging or drop it.
+For each candidate defect:
+
+1. Reproduce it with a focused test, or trace one concrete input through the code to the wrong
+   result.
+2. Confirmed: it is a finding. Record the input and the wrong behavior.
+3. Not confirmed: dig once more (callers, tests, config path). Still not confirmed: drop it.
+   A vague "consider" is not a finding.
 
 ## 5. Always-on passes
 
@@ -253,7 +250,7 @@ that matches nothing in this repo.
 ### (d) Cross-file duplication
 
 Before accepting a new helper, search `internal/**` and `cmd/**` for the one that already
-exists, by *behavior*. `go-style-guide` §16 lists them (token extraction, JSON responses,
+exists, by *behavior*. The *Reuse before writing* table in `go-style-guide` lists them (token extraction, JSON responses,
 token redaction, severity mapping, label copying, bounded timeouts, retry waits, nil-safe
 metrics, route and method labels).
 
@@ -262,9 +259,9 @@ metrics, route and method labels).
 - A flag in `parseCLI` (`cmd/gotilert/main.go`) needs the README to agree.
 - A config key in `internal/config/config.go` needs its entry in `examples/gotilert.yaml` and,
   when user-facing, the README's Configuration section.
-- Endpoints, token sources, label and annotation names are listed in the README. The README
-  does not list `/metrics` or the metric names today; a diff that changes metrics should add
-  them rather than widen the gap.
+- Endpoints, token sources, label and annotation names are listed in the README. If the
+  README lacks the `/metrics` endpoint or the metric names, a diff that changes metrics adds
+  them.
 
 A surface the code has and the docs do not mention is a finding; so is a documented one
 nothing implements, and a default in the docs that differs from the code.
