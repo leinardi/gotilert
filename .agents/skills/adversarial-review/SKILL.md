@@ -170,13 +170,14 @@ is a cardinality finding.
 - `/healthz`, `/readyz` and `/metrics` are unauthenticated. `/healthz` does no work;
   `/readyz` makes one bounded GET to Alertmanager per request. A change that makes either do
   more per request, or exposes anything else without a token, is a finding.
-- The image (`deployments/docker/Dockerfile`): every base pinned by tag and index digest (the
-  build stage on `dhi.io/golang:…-dev@sha256:…`, the runtime on `dhi.io/static:…@sha256:…`,
-  and the `# syntax=` frontend line too), and an explicit `USER 65532:65532`, so the uid does
-  not follow the base image's default. The runtime relies on the CA bundle `dhi.io/static`
+- The image (`deployments/docker/Dockerfile`): every base pinned by tag, not by digest, since
+  dhi.io republishes its tags with security fixes (the build stage on `dhi.io/golang:…-dev`,
+  the runtime on `dhi.io/static:…`); the `# syntax=` frontend line pinned by tag and index
+  digest; and an explicit `USER 65532:65532`, so the uid does not follow the base image's
+  default. The runtime relies on the CA bundle `dhi.io/static`
   ships at `/etc/ssl/certs/ca-certificates.crt` — without it HTTPS to Alertmanager fails.
   Adding root, removing the explicit `USER`, a shell or package manager in the runtime stage,
-  an unpinned base, or a runtime base without a CA bundle is a finding.
+  a base on `latest` or with no tag, or a runtime base without a CA bundle is a finding.
 
 ### Release and CI
 
