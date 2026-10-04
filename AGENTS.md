@@ -41,7 +41,7 @@ Project targets live in the local `.mk/*.mk` files listed in `MK_LOCAL_FILES`, n
 - `internal/alertmanager/` — the Alertmanager client: auth, TLS options, retries and the readiness probe.
 - `internal/config/` — the YAML config and its validation (`defaults.ttl > 0`, `severityFromPriority`, per-app tokens).
 - `internal/logger/`, `internal/metrics/` — slog setup; Prometheus metrics.
-- `deployments/docker/` — the Dockerfile (bases pinned by digest) and a compose example.
+- `deployments/docker/` — the Dockerfile (bases pinned by tag) and a compose example.
 - `docs/release.md` — how a release is cut and recovered.
 
 ## Invariants
