@@ -88,6 +88,17 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [pre-commit]
+      # Every in-file suppression counted per rule against .suppressions-baseline
+      # (scripts/check-suppressions.sh). Always runs: the ratchet reads the whole tree and the
+      # staged diff, and a commit that touches no source at all can still delete the baseline out
+      # from under it. Pinned to one stage, as above.
+      - id: check-suppressions
+        name: suppression ratchet
+        entry: scripts/check-suppressions.sh
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
   - repo: https://github.com/adrienverge/yamllint
     rev: v1.38.0
     hooks:
