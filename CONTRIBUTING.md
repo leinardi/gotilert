@@ -27,8 +27,10 @@ make check         # the full pre-commit suite on every file (golangci-lint, had
 make check-stage   # the same, on the staged files only
 ```
 
-CI runs the same hooks, the tests and the vulnerability scan on every pull request
-(`.github/workflows/ci.yaml`).
+CI runs the same hooks on every file (`pre-commit-all`), the tests and the vulnerability scan on
+every pull request and every push to `main` (`.github/workflows/ci.yaml`); `ci-result` is the one
+check that stands for all of them. `make verify-go` runs the build, the race tests, `go vet` and
+golangci-lint in one go.
 
 ## Branches and pull requests
 
