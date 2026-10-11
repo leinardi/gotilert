@@ -12,7 +12,7 @@
 ```bash
 make go-build      # static binary into ./dist/
 make go-test       # go test -race ./...
-make audit-deps    # govulncheck over every package (network required)
+make audit-deps    # govulncheck over every package, tests included (network required)
 make docker-build  # the container image, for the host's architecture
 ```
 
