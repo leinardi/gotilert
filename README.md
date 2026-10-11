@@ -1,47 +1,50 @@
 # Gotilert
 
-**Gotify-compatible** gateway that forwards notifications to **Prometheus Alertmanager**.
-Use it when a tool supports Gotify (but not Alertmanager) and you still want a single alerting pipeline.
+**Gotify-compatible** gateway that forwards notifications to **Prometheus Alertmanager**. Use it
+when a tool supports Gotify (but not Alertmanager) and you still want a single alerting pipeline.
 
 ## 💡 What is "Gotilert"?
 
-Gotilert exposes a small subset of Gotify's app API (mainly `POST /message`), validates/authenticates the request using an **app token**, then turns
-the message into a **firing Alertmanager alert** (via `/api/v2/alerts`).
+Gotilert exposes a small subset of Gotify's app API (mainly `POST /message`),
+validates/authenticates the request using an **app token**, then turns the message into a **firing
+Alertmanager alert** (via `/api/v2/alerts`).
 
 It's intentionally small: no users, no Web UI, no message history, just a bridge.
 
 ## 🪶 Resource usage
 
-Gotilert is designed to be lightweight. In typical Docker deployments it can sit around **~2.5 MiB RAM** when idle (exact usage depends on platform,
-Go version, and container runtime settings).
+Gotilert is designed to be lightweight. In typical Docker deployments it can sit around **~2.5 MiB
+RAM** when idle (exact usage depends on platform, Go version, and container runtime settings).
 
 ## 📦 What Gotilert Does
 
 - Implements **Gotify-ish** API:
-    - `POST /message` (JSON + form)
-    - Token auth via:
-        - `X-Gotify-Key: <token>`
-        - `?token=<token>`
-        - `Authorization: Bearer <token>`
+  - `POST /message` (JSON + form)
+  - Token auth via:
+    - `X-Gotify-Key: <token>`
+    - `?token=<token>`
+    - `Authorization: Bearer <token>`
 - Forwards to Alertmanager:
-    - `POST /api/v2/alerts`
-    - Optional **Basic Auth** or **Bearer token**
-    - Optional `tlsConfig.insecureSkipVerify` (useful for homelab self-signed setups)
-    - **Bounded retries** with short backoff for transient hiccups (timeouts, connection errors) and upstream `429/5xx`
+  - `POST /api/v2/alerts`
+  - Optional **Basic Auth** or **Bearer token**
+  - Optional `tlsConfig.insecureSkipVerify` (useful for homelab self-signed setups)
+  - **Bounded retries** with short backoff for transient hiccups (timeouts, connection errors) and
+    upstream `429/5xx`
 - Mapping:
-    - Gotify `priority` → Alert severity via `defaults.severityFromPriority` (required)
-    - TTL controls `startsAt/endsAt` (config, required: `defaults.ttl > 0`)
-    - Gotify well-known `extras` → Alertmanager **annotations**:
-        - `client::display.contentType` → `gotify_content_type`
-        - `client::notification.click.url` → `gotify_click_url`
-        - `client::notification.bigImageUrl` → `gotify_big_image_url`
-        - `android::action.onReceive.intentUrl` → `gotify_on_receive_intent_url`
+  - Gotify `priority` → Alert severity via `defaults.severityFromPriority` (required)
+  - TTL controls `startsAt/endsAt` (config, required: `defaults.ttl > 0`)
+  - Gotify well-known `extras` → Alertmanager **annotations**:
+    - `client::display.contentType` → `gotify_content_type`
+    - `client::notification.click.url` → `gotify_click_url`
+    - `client::notification.bigImageUrl` → `gotify_big_image_url`
+    - `android::action.onReceive.intentUrl` → `gotify_on_receive_intent_url`
 - Routing flexibility:
-    - Per-app token config: `appName`, labels, severity overrides
-    - `alertname` can be overridden globally (defaults) and per-app
+  - Per-app token config: `appName`, labels, severity overrides
+  - `alertname` can be overridden globally (defaults) and per-app
 - Alert identity (Gotify-like behavior):
-    - Alertmanager deduplicates alerts by their **labels**
-    - Gotilert includes a unique `gotilert_id` **label** per incoming message so every `POST /message` becomes a distinct alert
+  - Alertmanager deduplicates alerts by their **labels**
+  - Gotilert includes a unique `gotilert_id` **label** per incoming message so every `POST /message`
+    becomes a distinct alert
 
 ## 🔌 Endpoints
 
@@ -148,9 +151,8 @@ Alert name precedence:
 
 ## 🔔 Alertmanager routing tips (important)
 
-Alertmanager notification delivery depends on `route.group_by` and timers.
-If you want Gotilert to behave closer to Gotify (**one notification per message**),
-group Gotilert alerts by `gotilert_id`.
+Alertmanager notification delivery depends on `route.group_by` and timers. If you want Gotilert to
+behave closer to Gotify (**one notification per message**), group Gotilert alerts by `gotilert_id`.
 
 Example:
 
@@ -184,11 +186,12 @@ Tip: set `defaults.labels.environment` (e.g. `prod`) so alert grouping never mix
 - Gotilert is best run on an **internal network** (it's an ingress point for alerts).
 - If you expose it externally, put it behind a reverse proxy and apply:
 
-    - TLS
-    - IP allowlists / auth
-    - rate limiting
+  - TLS
+  - IP allowlists / auth
+  - rate limiting
 
 ## 🤝 Contributing
 
-PRs and issues are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Report vulnerabilities privately, as described in
-[SECURITY.md](SECURITY.md). How a release is cut, and how to verify one, is in [docs/release.md](docs/release.md).
+PRs and issues are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Report vulnerabilities
+privately, as described in [SECURITY.md](SECURITY.md). How a release is cut, and how to verify one,
+is in [docs/release.md](docs/release.md).
