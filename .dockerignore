@@ -1,0 +1,35 @@
+# The build context is the repository root (make docker-build, release.yaml), so this file sits
+# there: BuildKit reads .dockerignore from the context root, or <Dockerfile>.dockerignore beside the
+# Dockerfile, and nothing else.
+
+# VCS
+.git
+.gitignore
+.gitattributes
+
+# CI, docs, tests and agent tooling: none of it is an input of the image
+.github
+.claude
+.agents
+.serena
+docs
+examples
+test
+tests
+*.md
+
+# Local artifacts
+dist
+coverage.out
+coverage.html
+
+# Editor/IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Node/pip cache etc.
+node_modules
+__pycache__
+.fallow
