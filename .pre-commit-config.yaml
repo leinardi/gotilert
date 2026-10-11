@@ -78,6 +78,16 @@ repos:
         pass_filenames: false
         require_serial: true
         files: ^go\.(mod|sum)$
+      # The MIT header on every governed source file (scripts/check-license-headers.sh). It reads
+      # the whole tree, so it always runs; pinned to one stage because always_run makes a hook
+      # eligible at every installed stage, and commit-msg is one of them.
+      - id: check-license-headers
+        name: licence headers
+        entry: scripts/check-license-headers.sh
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
   - repo: https://github.com/adrienverge/yamllint
     rev: v1.38.0
     hooks:
