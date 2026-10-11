@@ -109,7 +109,7 @@ defer func() { _ = resp.Body.Close() }()
 
 ---
 
-## 3. `nolint` directives
+## 3. `nolint` directives and the suppression ratchet
 
 `nolintlint` enforces three things:
 
@@ -127,6 +127,15 @@ func (handler *PlainTextHandler) Handle(_ context.Context, record slog.Record) e
 
 Multiple linters are comma-separated with no spaces. Name all that fire: `gocyclo` and `cyclop`
 measure the same thing, and `gocognit` often joins them.
+
+**Suppressions are ratcheted.** [`.suppressions-baseline`](../../../.suppressions-baseline) holds
+one count per rule (`nolint/<linter>`, plus the shellcheck and hadolint families).
+`scripts/check-suppressions.sh` runs as the `check-suppressions` pre-commit hook and refuses a count
+above its baseline, a rule the baseline does not know, a count below its baseline (the file must
+describe the tree), and a staged diff that adds a suppression line without also changing the
+baseline. Every new, moved or removed suppression therefore needs
+`scripts/check-suppressions.sh --update`, committed with the change that earned it. Raising a count
+needs a reviewer's agreement; the baseline file is what they read.
 
 ---
 
@@ -332,13 +341,20 @@ gotilert/
 │   ├── metrics/           # Prometheus metrics on a private registry
 │   └── server/            # HTTP server: /message, /healthz, /readyz, /metrics
 ├── deployments/docker/    # Dockerfile, compose example
-└── examples/gotilert.yaml # annotated configuration
+├── examples/gotilert.yaml # annotated configuration
+└── test/                  # meta-tests: toolchain, dockerfiles, docs, licence headers, suppressions
 ```
 
 - `cmd/` wires, and also holds the forwarder: label merging, annotations, severity mapping.
 - Sentinels live in the package's `errors.go`, shared types in its `types.go`.
-- Every `.go` file starts with the MIT license block (`Copyright (c) 2025 Roberto Leinardi`), then
-  the `package` line; a package doc comment (`// Package server exposes …`) goes once per package.
+- Every `.go` file starts with the MIT license block (`Copyright (c) <year> Roberto Leinardi`, the
+  year of the file's first commit), then the `package` line; a package doc comment
+  (`// Package server exposes …`) goes once per package. `scripts/check-license-headers.sh` (a
+  pre-commit hook) fails on a Go file without it.
+- A meta-test under `test/` that needs an external tool looks it up through
+  `test/internal/toolgate` (a skip locally, a failure under `GOTILERT_REQUIRE_TOOLS=1` in CI), never
+  with `exec.LookPath`; a git command in a scratch repository runs with `gitenv.Isolated()`, so
+  under the commit hook it cannot reach the real index.
 - `version`, `commit`, `date` in `cmd/gotilert/version.go` are `var`s so `-ldflags -X` can set them.
 
 ---
@@ -421,7 +437,8 @@ gotilert/
 - [ ] No `errors.New` or `%w`-less `fmt.Errorf` in a function body: wrap a package-level sentinel
 - [ ] `any` not `interface{}`; `new(expr)`, not a pointer-boxing helper
 - [ ] Numbers other than 0–3 extracted to named constants (non-test code)
-- [ ] Each `//nolint` names specific linters and explains why the fix does not apply
+- [ ] Each `//nolint` names specific linters, explains why the fix does not apply, and is committed
+  with `scripts/check-suppressions.sh --update`
 - [ ] No `FIXME` comments
 - [ ] Function statement count ≤ 50 (non-test code)
 - [ ] No shadowed variables; errors named after their source
@@ -435,7 +452,10 @@ gotilert/
 ## Lint and test loop
 
 1. Run `pre-commit run golangci-lint-fmt --files <changed .go files>` and
-   `pre-commit run golangci-lint-full --files <changed .go files>` (or `--all-files`).
-2. Run `make go-vet` and `make go-test`.
+   `pre-commit run golangci-lint-full --files <changed .go files>`, or `make go-lint` for the whole
+   module (the same pinned golangci-lint).
+2. Run `make verify-go` (build, race tests, vet, lint).
 3. Fix each report and re-run from step 1 until all of them are clean.
 4. Check `git status`: the formatter hook rewrites files in place, so review and keep its changes.
+   If you added or removed a suppression, run `scripts/check-suppressions.sh --update` and stage
+   `.suppressions-baseline`.
