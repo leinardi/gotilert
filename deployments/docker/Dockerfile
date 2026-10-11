@@ -65,10 +65,19 @@ RUN --mount=type=cache,target=/go/pkg/mod,id=gomodcache \
 ########################
 FROM dhi.io/static:20250419
 
-# hadolint ignore=DL3050
+# Re-declared: a build argument is scoped to the stage that declares it. The values are the ones
+# the build stage stamps into the binary.
+ARG VERSION="dev"
+ARG COMMIT="none"
+ARG DATE="unknown"
+
+# The seven OCI labels .hadolint.yaml requires (label-schema, strict-labels).
 LABEL org.opencontainers.image.title="gotilert" \
 	org.opencontainers.image.description="Gotify-compatible gateway that forwards notifications to Alertmanager" \
 	org.opencontainers.image.source="https://github.com/leinardi/gotilert" \
+	org.opencontainers.image.version="${VERSION}" \
+	org.opencontainers.image.revision="${COMMIT}" \
+	org.opencontainers.image.created="${DATE}" \
 	org.opencontainers.image.licenses="MIT"
 
 # Copy the binary
