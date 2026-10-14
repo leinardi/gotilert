@@ -11,13 +11,13 @@ description: >
 
 # Go Style Guide — gotilert
 
-Rules derived from `.golangci.yaml` (golangci-lint v2, `default: all`) and verified
-against the existing codebase in `cmd/` and `internal/`. §1–§15 are what the linters
-enforce, §16–§18 are review rules, and §19–§23 are this gateway's own patterns.
+Rules derived from `.golangci.yaml` (golangci-lint v2, `default: all`) and verified against the
+existing codebase in `cmd/` and `internal/`. §1–§15 are what the linters enforce, §16–§18 are review
+rules, and §19–§23 are this gateway's own patterns.
 
 golangci-lint is not on `PATH` in every environment; run it through pre-commit
-(`pre-commit run golangci-lint-full --all-files`). Never commit with `--no-verify` —
-fix the underlying issue instead.
+(`pre-commit run golangci-lint-full --all-files`). Never commit with `--no-verify` — fix the
+underlying issue instead.
 
 Linters that are **disabled** in `.golangci.yaml`, so their rules do not apply:
 
@@ -29,17 +29,17 @@ Linters that are **disabled** in `.golangci.yaml`, so their rules do not apply:
 | `nonamedreturns` | Named returns are allowed |
 | `wsl` | The deprecated v4 linter; its successor `wsl_v5` stays enabled |
 
-The formatters (`gci`, `gofmt`, `gofumpt`, `goimports`, `golines`) run in the
-`golangci-lint-fmt` hook and in CI.
+The formatters (`gci`, `gofmt`, `gofumpt`, `goimports`, `golines`) run in the `golangci-lint-fmt`
+hook and in CI.
 
 ---
 
 ## 1. Import grouping
 
 Three groups separated by blank lines — stdlib, third-party, then local
-`github.com/leinardi/gotilert/...` — alphabetical within each group. `gci` and `goimports`
-both enforce it and the `golangci-lint-fmt` hook rewrites it, so there is nothing to do by
-hand beyond not fighting the formatter.
+`github.com/leinardi/gotilert/...` — alphabetical within each group. `gci` and `goimports` both
+enforce it and the `golangci-lint-fmt` hook rewrites it, so there is nothing to do by hand beyond
+not fighting the formatter.
 
 ---
 
@@ -72,31 +72,31 @@ if err != nil {
 }
 ```
 
-The prefix is a short, lowercase phrase naming the operation, not a full sentence: no
-capital letters, no trailing period. Compare with `errors.Is`/`errors.As` (or the generic
-`errors.AsType[T]`, used throughout `shouldRetry`), never `==` on error values. Prefer
-flat code with early returns; no `else` after a `return` (`revive`'s `indent-error-flow`).
+The prefix is a short, lowercase phrase naming the operation, not a full sentence: no capital
+letters, no trailing period. Compare with `errors.Is`/`errors.As` (or the generic
+`errors.AsType[T]`, used throughout `shouldRetry`), never `==` on error values. Prefer flat code
+with early returns; no `else` after a `return` (`revive`'s `indent-error-flow`).
 
 ### 2c. Errors are sentinels, detail is wrapped (`err113`)
 
-`err113` flags every `errors.New` inside a function body and every `fmt.Errorf` without a
-`%w` verb. Declare the error once as a package-level sentinel (in the package's
-`errors.go`; `config` keeps its own at the top of `config.go`) and wrap the detail:
+`err113` flags every `errors.New` inside a function body and every `fmt.Errorf` without a `%w` verb.
+Declare the error once as a package-level sentinel (in the package's `errors.go`; `config` keeps its
+own at the top of `config.go`) and wrap the detail:
 
 ```go
 return fmt.Errorf("%w: %q", ErrAlertmanagerURLInvalidScheme, parsed.Scheme)
 return fmt.Errorf("%w: %w", ErrDoRequest, err)
 ```
 
-Export a sentinel (`Err…`) when callers need `errors.Is`. When an error must carry
-structured data, implement `error` on a private struct and expose an interface, as
-`statusError` / `HTTPStatusError` in `internal/alertmanager/client.go` do. Suppress with
-`//nolint:err113` only when no sentinel can fit, and say why (§3).
+Export a sentinel (`Err…`) when callers need `errors.Is`. When an error must carry structured data,
+implement `error` on a private struct and expose an interface, as `statusError` / `HTTPStatusError`
+in `internal/alertmanager/client.go` do. Suppress with `//nolint:err113` only when no sentinel can
+fit, and say why (§3).
 
 ### 2d. Aggregating multiple errors
 
-Default: `errors.Join` over a slice of wrapped errors. The exception is `config.Validate`,
-which returns at the first invalid section.
+Default: `errors.Join` over a slice of wrapped errors. The exception is `config.Validate`, which
+returns at the first invalid section.
 
 ### 2e. Ignoring errors explicitly
 
@@ -109,7 +109,7 @@ defer func() { _ = resp.Body.Close() }()
 
 ---
 
-## 3. `nolint` directives
+## 3. `nolint` directives and the suppression ratchet
 
 `nolintlint` enforces three things:
 
@@ -117,16 +117,25 @@ defer func() { _ = resp.Body.Close() }()
 - **Explanation required**: every directive needs `// reason`
 - **No unused**: remove directives when the code no longer triggers that linter
 
-The explanation says why the fix does not apply here, not which rule fired (§17). A
-statement gets an inline directive; a function or type gets it on the preceding line:
+The explanation says why the fix does not apply here, not which rule fired (§17). A statement gets
+an inline directive; a function or type gets it on the preceding line:
 
 ```go
 //nolint:gocritic // slog.Handler requires slog.Record by value; cannot change the signature.
 func (handler *PlainTextHandler) Handle(_ context.Context, record slog.Record) error {
 ```
 
-Multiple linters are comma-separated with no spaces. Name all that fire: `gocyclo` and
-`cyclop` measure the same thing, and `gocognit` often joins them.
+Multiple linters are comma-separated with no spaces. Name all that fire: `gocyclo` and `cyclop`
+measure the same thing, and `gocognit` often joins them.
+
+**Suppressions are ratcheted.** [`.suppressions-baseline`](../../../.suppressions-baseline) holds
+one count per rule (`nolint/<linter>`, plus the shellcheck and hadolint families).
+`scripts/check-suppressions.sh` runs as the `check-suppressions` pre-commit hook and refuses a count
+above its baseline, a rule the baseline does not know, a count below its baseline (the file must
+describe the tree), and a staged diff that adds a suppression line without also changing the
+baseline. Every new, moved or removed suppression therefore needs
+`scripts/check-suppressions.sh --update`, committed with the change that earned it. Raising a count
+needs a reviewer's agreement; the baseline file is what they read.
 
 ---
 
@@ -139,17 +148,17 @@ Multiple linters are comma-separated with no spaces. Name all that fire: `gocycl
 | `gocognit` | 35 | Cognitive complexity |
 | `funlen` | 50 statements | Lines are disabled (`lines: -1`) |
 
-Prefer extracting helpers over suppressing: `config.Validate` delegates to one
-`validate…` method per section. Test files are exempt from `funlen`, `gocognit`,
-`gocyclo`, `maintidx` and the `cyclop` "calculated cyclomatic complexity" check.
+Prefer extracting helpers over suppressing: `config.Validate` delegates to one `validate…` method
+per section. Test files are exempt from `funlen`, `gocognit`, `gocyclo`, `maintidx` and the `cyclop`
+"calculated cyclomatic complexity" check.
 
 ---
 
 ## 5. Magic numbers (`mnd`)
 
-Numbers 0, 1, 2, 3 are allowed everywhere. Any other literal in an `argument`, `case`,
-`condition`, or `return` position needs a named constant. Any literal used more than once,
-or that needs explaining, is a constant too:
+Numbers 0, 1, 2, 3 are allowed everywhere. Any other literal in an `argument`, `case`, `condition`,
+or `return` position needs a named constant. Any literal used more than once, or that needs
+explaining, is a constant too:
 
 ```go
 const (
@@ -174,9 +183,9 @@ Use `any` instead of `interface{}`; `gofmt`'s rewrite rule changes it anyway.
 ## 7. Struct size (`gocritic hugeParam`)
 
 Structs over ~80 bytes passed by value trigger `hugeParam`. Pass by pointer
-(`server.New(opts *Options)`, `alertmanager.New(opts *Options)`) — or suppress when an
-interface fixes the signature (`slog.Handler`, §3). The same applies to `rangeValCopy`:
-iterate large slices by index.
+(`server.New(opts *Options)`, `alertmanager.New(opts *Options)`) — or suppress when an interface
+fixes the signature (`slog.Handler`, §3). The same applies to `rangeValCopy`: iterate large slices
+by index.
 
 ---
 
@@ -199,40 +208,38 @@ Max 140 characters. `golines` wraps automatically. Test files are exempt.
 ## 10. Comments and `godox`
 
 - `FIXME` is flagged by `godox`. `TODO` is allowed.
-- gocritic's `whyNoLint` check is disabled, but every `//nolint` still needs an
-  explanation (`require-explanation`).
+- gocritic's `whyNoLint` check is disabled, but every `//nolint` still needs an explanation
+  (`require-explanation`).
 - Exported symbols in new code get a doc comment beginning with the symbol name
-  (`// HealthFunc returns whether the service is healthy…`). No linter asks for it here,
-  and some existing ones (`alertmanager.Client`, `metrics.Metrics`) have none; do not add
-  them to code you did not otherwise change.
+  (`// HealthFunc returns whether the service is healthy…`). No linter asks for it here, and some
+  existing ones (`alertmanager.Client`, `metrics.Metrics`) have none; do not add them to code you
+  did not otherwise change.
 - Inline comments explain *why*, not *what* (§17).
 
 ---
 
 ## 11. Duplication (`dupl`)
 
-Avoid copy-pasting blocks longer than ~100 tokens (`threshold: 100`). Test files are
-exempt.
+Avoid copy-pasting blocks longer than ~100 tokens (`threshold: 100`). Test files are exempt.
 
 ---
 
 ## 12. Shadowing (`govet shadow`)
 
-`govet` shadow detection is enabled. Name errors after their source rather than reusing
-`err` in a nested scope: `postErr`, `readyErr`, `readErr`, `sleepErr`, `ctxErr`.
+`govet` shadow detection is enabled. Name errors after their source rather than reusing `err` in a
+nested scope: `postErr`, `readyErr`, `readErr`, `sleepErr`, `ctxErr`.
 
 ---
 
 ## 13. Variable naming (`varnamelen`)
 
-`varnamelen` flags a name shorter than 3 characters whose last use is more than 5 lines
-from its declaration (defaults: `min-name-length: 3`, `max-distance: 5`). Test files are
-exempt.
+`varnamelen` flags a name shorter than 3 characters whose last use is more than 5 lines from its
+declaration (defaults: `min-name-length: 3`, `max-distance: 5`). Test files are exempt.
 
-- **Receivers are exempt**: `(m *Metrics)`, `(e *statusError)` are fine; most of the code
-  still uses the long form (`(client *Client)`, `(handler *PlainTextHandler)`).
-- **Parameters are checked like locals.** A one-letter parameter passes in a three-line
-  function and is flagged as soon as the body grows, so name them from the start:
+- **Receivers are exempt**: `(m *Metrics)`, `(e *statusError)` are fine; most of the code still uses
+  the long form (`(client *Client)`, `(handler *PlainTextHandler)`).
+- **Parameters are checked like locals.** A one-letter parameter passes in a three-line function and
+  is flagged as soon as the body grows, so name them from the start:
 
   ```go
   // Wrong
@@ -248,19 +255,19 @@ The codebase leans long: `responseWriter`, `messageIdentifier`, `metricsCollecto
 
 ## 14. `modernize` — no pointer-boxing helpers
 
-The `modernize` linter (`newexpr` check) flags any function whose sole purpose is to return
-a pointer to its argument — the generic `func ptr[T any](v T) *T` included — at the
-declaration and at every call site. The Go version in `go.mod` lets `new` take an
-expression: write `new(true)` or `new(int64(5))`. Taking the address of a local is fine too.
+The `modernize` linter (`newexpr` check) flags any function whose sole purpose is to return a
+pointer to its argument — the generic `func ptr[T any](v T) *T` included — at the declaration and at
+every call site. The Go version in `go.mod` lets `new` take an expression: write `new(true)` or
+`new(int64(5))`. Taking the address of a local is fine too.
 
 ---
 
 ## 15. Constant strings (`goconst`)
 
-String literals appearing 3+ times with length ≥ 2 become a named constant. Test files are
-exempt. Existing examples: the route constants (`metricsPath`, `healthzPath`, `readyzPath`,
-`messagePath`) and the metric label fallbacks (`unmatchedRoute`, `otherMethod`) in
-`internal/server/http.go`; the severity and log level names in `internal/config/config.go`.
+String literals appearing 3+ times with length ≥ 2 become a named constant. Test files are exempt.
+Existing examples: the route constants (`metricsPath`, `healthzPath`, `readyzPath`, `messagePath`)
+and the metric label fallbacks (`unmatchedRoute`, `otherMethod`) in `internal/server/http.go`; the
+severity and log level names in `internal/config/config.go`.
 
 ---
 
@@ -286,9 +293,9 @@ exempt. Existing examples: the route constants (`metricsPath`, `healthzPath`, `r
 
 ## 17. Comments carry rationale; history goes in the commit
 
-A comment says **why the code is the way it is** — the constraint, the failure it avoids,
-the alternative that was rejected. It does not narrate what changed, when, or at whose
-request; that belongs in the commit body.
+A comment says **why the code is the way it is** — the constraint, the failure it avoids, the
+alternative that was rejected. It does not narrate what changed, when, or at whose request; that
+belongs in the commit body.
 
 ```go
 // Bad — history in the code.
@@ -304,21 +311,20 @@ The same rule makes `//nolint` explanations useful: say why the fix does not app
 
 ## 18. Waiting in tests: classify before you write a sleep
 
-Tests call handlers and the client synchronously against `httptest` servers and count
-requests with `atomic.Int32`; they do not sleep. If a test has to wait, decide the class first:
+Tests call handlers and the client synchronously against `httptest` servers and count requests with
+`atomic.Int32`; they do not sleep. If a test has to wait, decide the class first:
 
-- **Positive eventual — never a sleep.** Wait on a channel or poll with a deadline and fail
-  naming what never happened. Before writing a polling helper, check the test packages for an
-  existing one; add a shared helper only when a second site needs it.
-- **Negative assertion — bounded and commented.** Give the wrong behavior a bounded window,
-  assert it did not appear, and say in a comment that this is what the wait is.
-- **Real elapsed window — the duration is the point.** A backoff step. Name it as a constant
-  or a multiple of the interval under test (`defaultRetryInitial`), never a literal chosen by
-  feel.
+- **Positive eventual — never a sleep.** Wait on a channel or poll with a deadline and fail naming
+  what never happened. Before writing a polling helper, check the test packages for an existing one;
+  add a shared helper only when a second site needs it.
+- **Negative assertion — bounded and commented.** Give the wrong behavior a bounded window, assert
+  it did not appear, and say in a comment that this is what the wait is.
+- **Real elapsed window — the duration is the point.** A backoff step. Name it as a constant or a
+  multiple of the interval under test (`defaultRetryInitial`), never a literal chosen by feel.
 - **Ordering barrier with no quiescence signal** — say in a comment why no seam exists.
 
-A sleep whose comment says "give X time to Y" where Y is observable, or one added to make a
-flaky test pass, is always wrong.
+A sleep whose comment says "give X time to Y" where Y is observable, or one added to make a flaky
+test pass, is always wrong.
 
 ---
 
@@ -335,23 +341,28 @@ gotilert/
 │   ├── metrics/           # Prometheus metrics on a private registry
 │   └── server/            # HTTP server: /message, /healthz, /readyz, /metrics
 ├── deployments/docker/    # Dockerfile, compose example
-└── examples/gotilert.yaml # annotated configuration
+├── examples/gotilert.yaml # annotated configuration
+└── test/                  # meta-tests: toolchain, dockerfiles, docs, licence headers, suppressions
 ```
 
 - `cmd/` wires, and also holds the forwarder: label merging, annotations, severity mapping.
 - Sentinels live in the package's `errors.go`, shared types in its `types.go`.
-- Every `.go` file starts with the MIT license block (`Copyright (c) 2025 Roberto
-  Leinardi`), then the `package` line; a package doc comment (`// Package server exposes …`)
-  goes once per package.
-- `version`, `commit`, `date` in `cmd/gotilert/version.go` are `var`s so `-ldflags -X` can
-  set them.
+- Every `.go` file starts with the MIT license block (`Copyright (c) <year> Roberto Leinardi`, the
+  year of the file's first commit), then the `package` line; a package doc comment
+  (`// Package server exposes …`) goes once per package. `scripts/check-license-headers.sh` (a
+  pre-commit hook) fails on a Go file without it.
+- A meta-test under `test/` that needs an external tool looks it up through
+  `test/internal/toolgate` (a skip locally, a failure under `GOTILERT_REQUIRE_TOOLS=1` in CI), never
+  with `exec.LookPath`; a git command in a scratch repository runs with `gitenv.Isolated()`, so
+  under the commit hook it cannot reach the real index.
+- `version`, `commit`, `date` in `cmd/gotilert/version.go` are `var`s so `-ldflags -X` can set them.
 
 ---
 
 ## 20. Logging
 
-- `log/slog` only, through `logger.L()`. `run` configures it from the CLI flags first, then
-  again from the config file where no flag overrode it (`applyLoggingConfig`).
+- `log/slog` only, through `logger.L()`. `run` configures it from the CLI flags first, then again
+  from the config file where no flag overrode it (`applyLoggingConfig`).
 - Structured key/value fields, never `fmt.Sprintf` in a log call:
 
   ```go
@@ -360,8 +371,8 @@ gotilert/
 
   Established keys: `"err"`, `"app"`, `"upstream"`, `"upstream_status"`, `"upstream_body"`,
   `"method"`, `"path"`, `"status"`, `"duration"`. Reuse them.
-- Never log a token, a password, a bearer token or a full request URL: the token may be in the
-  query string, which is why the request log records `request.URL.Path` only.
+- Never log a token, a password, a bearer token or a full request URL: the token may be in the query
+  string, which is why the request log records `request.URL.Path` only.
 - There is no fatal level: `run` returns an error and `main` exits once.
 
 ---
@@ -370,12 +381,11 @@ gotilert/
 
 - A function that does I/O takes `ctx context.Context` first; outbound requests use
   `http.NewRequestWithContext`.
-- Every wait on Alertmanager is bounded: the per-attempt `http.Client.Timeout`, the whole
-  forward under `withBoundedTimeout`, and `/readyz` under `defaultReadyTimeout`. A new
-  outbound call without a deadline is a finding.
-- A wait between attempts selects on `ctx.Done()` (`sleepWithContext`), and `PostAlerts`
-  checks `ctx.Err()` after every attempt, so a cancelled or expired context ends the retry
-  loop at once.
+- Every wait on Alertmanager is bounded: the per-attempt `http.Client.Timeout`, the whole forward
+  under `withBoundedTimeout`, and `/readyz` under `defaultReadyTimeout`. A new outbound call without
+  a deadline is a finding.
+- A wait between attempts selects on `ctx.Done()` (`sleepWithContext`), and `PostAlerts` checks
+  `ctx.Err()` after every attempt, so a cancelled or expired context ends the retry loop at once.
 
 ---
 
@@ -384,24 +394,23 @@ gotilert/
 - Build an `http.Server` in `server.New` with explicit `ReadTimeout`, `WriteTimeout` and
   `IdleTimeout` (`ReadHeaderTimeout` falls back to `ReadTimeout`); never the package-level
   `http.ListenAndServe`. Shut down with `server.Shutdown` under the configured timeout.
-- Handlers are closures returning `http.HandlerFunc` (`healthHandler`, `messageHandler`);
-  routes are registered in `server.New`; an unused `*http.Request` is named `_`.
-- `/message` authenticates before it reads the body, then caps the body with
-  `http.MaxBytesReader`. Error bodies are `{"error": …}` via `writeJSONError`, and an
-  upstream failure returns the generic `ErrUpstreamFailed`, never the upstream response.
+- Handlers are closures returning `http.HandlerFunc` (`healthHandler`, `messageHandler`); routes are
+  registered in `server.New`; an unused `*http.Request` is named `_`.
+- `/message` authenticates before it reads the body, then caps the body with `http.MaxBytesReader`.
+  Error bodies are `{"error": …}` via `writeJSONError`, and an upstream failure returns the generic
+  `ErrUpstreamFailed`, never the upstream response.
 
 ---
 
 ## 23. Prometheus metrics
 
-- All metrics live in `internal/metrics` on a private `prometheus.Registry`, registered
-  explicitly in `metrics.New()` (no `init()`), exposed with `promhttp.HandlerFor`.
-- Names are `gotilert_…`; a rename or a label change breaks dashboards (see the *Metrics are
-  a public contract* invariant in `adversarial-review`).
+- All metrics live in `internal/metrics` on a private `prometheus.Registry`, registered explicitly
+  in `metrics.New()` (no `init()`), exposed with `promhttp.HandlerFor`.
+- Names are `gotilert_…`; a rename or a label change breaks dashboards (see the *Metrics are a
+  public contract* invariant in `adversarial-review`).
 - Label values come from bounded sets only: app names from the config, route patterns
   (`routeLabel`), standard methods (`methodLabel`), status codes.
-- The recording methods on `*Metrics` return early on a nil receiver, so callers need no
-  guard.
+- The recording methods on `*Metrics` return early on a nil receiver, so callers need no guard.
 
 ---
 
@@ -413,8 +422,8 @@ gotilert/
 - An outbound call without a deadline, or a retry wait that ignores `ctx` (§21).
 - A request-controlled value as a metric label (§23).
 - `interface{}` (§6) and pointer-boxing helpers (§14).
-- Designing for hypothetical requirements: no configurability or abstractions for features
-  that do not exist yet.
+- Designing for hypothetical requirements: no configurability or abstractions for features that do
+  not exist yet.
 - Skipping or suppressing pre-commit hooks (`--no-verify`).
 - Adding comments to code you did not change (§10).
 
@@ -428,7 +437,8 @@ gotilert/
 - [ ] No `errors.New` or `%w`-less `fmt.Errorf` in a function body: wrap a package-level sentinel
 - [ ] `any` not `interface{}`; `new(expr)`, not a pointer-boxing helper
 - [ ] Numbers other than 0–3 extracted to named constants (non-test code)
-- [ ] Each `//nolint` names specific linters and explains why the fix does not apply
+- [ ] Each `//nolint` names specific linters, explains why the fix does not apply, and is committed
+  with `scripts/check-suppressions.sh --update`
 - [ ] No `FIXME` comments
 - [ ] Function statement count ≤ 50 (non-test code)
 - [ ] No shadowed variables; errors named after their source
@@ -442,7 +452,10 @@ gotilert/
 ## Lint and test loop
 
 1. Run `pre-commit run golangci-lint-fmt --files <changed .go files>` and
-   `pre-commit run golangci-lint-full --files <changed .go files>` (or `--all-files`).
-2. Run `make go-vet` and `make go-test`.
+   `pre-commit run golangci-lint-full --files <changed .go files>`, or `make go-lint` for the whole
+   module (the same pinned golangci-lint).
+2. Run `make verify-go` (build, race tests, vet, lint).
 3. Fix each report and re-run from step 1 until all of them are clean.
 4. Check `git status`: the formatter hook rewrites files in place, so review and keep its changes.
+   If you added or removed a suppression, run `scripts/check-suppressions.sh --update` and stage
+   `.suppressions-baseline`.
