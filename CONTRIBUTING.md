@@ -7,6 +7,10 @@
 - [`pre-commit`](https://pre-commit.com/): install the hooks once with `make pre-commit-install`. It
   installs both the `pre-commit` and the `commit-msg` hooks, so commit messages are checked when you
   commit, not when the release runs.
+- A Rust toolchain (`cargo`): pre-commit builds the Dockerfile linter,
+  [droast](https://github.com/immanuwell/dockerfile-roast), from source at its pinned rev.
+- [ShellCheck](https://github.com/koalaman/shellcheck) on PATH, at the release
+  `.github/actions/setup-shellcheck` pins: droast's required ShellCheck bridge runs it.
 
 ## Building and testing
 
@@ -23,7 +27,7 @@ needs a `docker login dhi.io` first, with a Docker account that has access to th
 ## Linting
 
 ```bash
-make check         # the full pre-commit suite on every file (golangci-lint, hadolint, markdownlint, shellcheck, ...)
+make check         # the full pre-commit suite on every file (golangci-lint, droast, markdownlint, shellcheck, ...)
 make check-stage   # the same, on the staged files only
 ```
 

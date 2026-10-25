@@ -42,7 +42,7 @@ const (
 	shippedDir        = "deployments/docker"
 	shippedDockerfile = "deployments/docker/Dockerfile"
 	releaseWorkflow   = ".github/workflows/release.yaml"
-	hadolintConfig    = ".hadolint.yaml"
+	droastConfig      = "droast.toml"
 	runtimeUser       = "65532:65532"
 )
 
@@ -200,15 +200,18 @@ func TestRuntimeStage(t *testing.T) {
 	}
 }
 
-// TestHadolintEnforcesTheLabels runs hadolint, with the repository's configuration, on the shipped
+// TestDroastEnforcesTheLabels runs droast, with the repository's configuration, on the shipped
 // Dockerfile and on copies that drop a required label or add an unknown one: the label schema is
-// only a gate if hadolint fails the last two.
-func TestHadolintEnforcesTheLabels(t *testing.T) {
+// only a gate if droast fails the last two. droast.toml makes the ShellCheck bridge required, so
+// droast needs shellcheck on PATH as well and the test is gated on both.
+func TestDroastEnforcesTheLabels(t *testing.T) {
 	t.Parallel()
 
-	hadolint := toolgate.Lookup(t, toolgate.Hadolint)
-	config := repoPath(t, hadolintConfig)
-	readRepoFile(t, hadolintConfig)
+	droast := toolgate.Lookup(t, toolgate.Droast)
+	toolgate.Lookup(t, toolgate.ShellCheck)
+
+	config := repoPath(t, droastConfig)
+	readRepoFile(t, droastConfig)
 
 	shipped := readRepoFile(t, shippedDockerfile)
 	created := `	org.opencontainers.image.created="${DATE}" \` + "\n"
@@ -221,16 +224,19 @@ func TestHadolintEnforcesTheLabels(t *testing.T) {
 		content string
 		pass    bool
 		want    string
+		detail  string
 	}{
 		"the shipped Dockerfile": {content: shipped, pass: true},
 		"a required label dropped": {
 			content: strings.Replace(shipped, created, "", 1),
-			want:    "DL3049",
+			want:    "DF074",
+			detail:  "'org.opencontainers.image.created' is missing",
 		},
 		"an unknown label added": {
 			content: strings.Replace(shipped, created,
 				created+`	org.opencontainers.image.vendor="someone" \`+"\n", 1),
-			want: "DL3050",
+			want:   "DF074",
+			detail: "'org.opencontainers.image.vendor' is not allowed",
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -243,16 +249,17 @@ func TestHadolintEnforcesTheLabels(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			cmd := exec.CommandContext(t.Context(), hadolint, "--config", config, "--no-color",
-				path)
+			cmd := exec.CommandContext(t.Context(), droast, "--config", config, path)
 
 			out, err := cmd.CombinedOutput()
 			if test.pass && err != nil {
-				t.Errorf("hadolint rejected it: %v\n%s", err, out)
+				t.Errorf("droast rejected it: %v\n%s", err, out)
 			}
 
-			if !test.pass && (err == nil || !strings.Contains(string(out), test.want)) {
-				t.Errorf("hadolint did not fail it with %s: %v\n%s", test.want, err, out)
+			if !test.pass && (err == nil || !strings.Contains(string(out), test.want) ||
+				!strings.Contains(string(out), test.detail)) {
+				t.Errorf("droast did not fail it with %s (%s): %v\n%s", test.want, test.detail, err,
+					out)
 			}
 		})
 	}

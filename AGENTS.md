@@ -32,6 +32,13 @@ Single test:
 go test ./internal/server -run TestAuthTokenPrecedence -v
 ```
 
+`make check` lints the Dockerfile with droast (Dockerfile Roast). pre-commit builds droast from
+source at its pinned rev, which needs a Rust toolchain (`cargo`) locally. Its required ShellCheck
+bridge runs the `shellcheck` on PATH, so install ShellCheck locally at the release
+`.github/actions/setup-shellcheck` pins (CI installs it with that action). The label meta-test in
+`test/dockerfiles` runs the `droast` on PATH, at the release `.github/actions/setup-droast` pins
+(the hook's rev); without it, or without `shellcheck`, the test skips locally.
+
 The Makefile pulls shared snippets from `leinardi/make-common@v1` into `.mk/` on first run. To
 refresh: `make mk-common-update`. Project targets live in the local `.mk/*.mk` files listed in
 `MK_LOCAL_FILES`, never as recipes in the Makefile.
@@ -52,9 +59,9 @@ refresh: `make mk-common-update`. Project targets live in the local `.mk/*.mk` f
 - `deployments/docker/` — the Dockerfile (bases pinned by tag) and a compose example; the build
   context is the repository root, so `.dockerignore` sits there.
 - `docs/release.md` — how a release is cut and recovered.
-- `test/` — meta-tests, all ordinary Go packages: `test/toolchain` (the Go line, the hadolint pin,
-  the whole-tree hooks, no vacuous gate flags), `test/dockerfiles` (the image's invariants and the
-  hadolint label schema), `test/docs` (Markdown links), `test/licenseheaders` and
+- `test/` — meta-tests, all ordinary Go packages: `test/toolchain` (the Go line, the droast and
+  ShellCheck pins, the whole-tree hooks, no vacuous gate flags), `test/dockerfiles` (the image's
+  invariants and the droast label schema), `test/docs` (Markdown links), `test/licenseheaders` and
   `test/suppressions` (drive the two `scripts/check-*.sh` hooks), and `test/internal/` (`gitenv`,
   `toolgate`). A meta-test that needs a tool gets it through `toolgate`: a skip locally, a failure
   with `GOTILERT_REQUIRE_TOOLS=1`, which CI's `go-test` job sets.
@@ -90,14 +97,14 @@ The ones to keep in mind while writing code:
   year of its first commit. `scripts/check-license-headers.sh` (the always-run
   `check-license-headers` hook) fails on any tracked Go or shell file, Dockerfile, Makefile or
   repo-local `.mk` fragment without it; the make-common files are exempt.
-- A new `//nolint`, `# shellcheck disable=` or `# hadolint ignore=` explains why the fix does not
-  apply here, not which rule fired.
+- A new `//nolint`, `# shellcheck disable=` or `# droast ignore=` explains why the fix does not
+  apply here, not which rule fired; droast also requires its `reason="..."`.
 
 ## Suppressions are ratcheted
 
 Every in-file suppression is counted per rule against `.suppressions-baseline` by the
 `check-suppressions` pre-commit hook (`scripts/check-suppressions.sh`): `//nolint:<linter>`,
-`# shellcheck disable=`, `# hadolint ignore=` and `# hadolint global ignore=`.
+`# shellcheck disable=`, `# droast ignore=` and `# droast global ignore=`.
 
 Adding one is allowed, but never silently: the hook refuses a commit that adds a suppression line
 without changing the baseline in the same commit, including a swap or a moved file that leaves the
@@ -114,7 +121,7 @@ Run before considering an edit done. `make check` applies to every row.
 | --- | --- |
 | `**/*.go` | `make verify-go`, then `make check-stage` |
 | `go.mod`, `go.sum` | `make go-tidy`, `make audit-deps` (network; the commit hook runs it too), `go test ./test/toolchain/` |
-| `deployments/docker/Dockerfile`, `.hadolint.yaml`, `.dockerignore` | `go test ./test/dockerfiles/ ./test/toolchain/` (hadolint runs in `make check`); `make docker-build` (needs `docker login dhi.io`) |
+| `deployments/docker/Dockerfile`, `droast.toml`, `.dockerignore` | `go test ./test/dockerfiles/ ./test/toolchain/` (droast runs in `make check`); `make docker-build` (needs `docker login dhi.io`) |
 | `scripts/check-license-headers.sh` | `go test ./test/licenseheaders/` |
 | `scripts/check-suppressions.sh`, `.suppressions-baseline` | `go test ./test/suppressions/` |
 | `scripts/hooks/gofmt-on-edit.sh` | shellcheck (in `make check`); no test package: run it once by editing a `.go` file in Claude Code |

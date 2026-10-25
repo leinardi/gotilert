@@ -42,11 +42,15 @@ import (
 // RequireEnv is the variable that turns a missing tool from a skip into a failure.
 const RequireEnv = "GOTILERT_REQUIRE_TOOLS"
 
-// Hadolint is the Dockerfile linter the hadolint pre-commit hook runs from PATH.
-const Hadolint = "hadolint"
+// Droast is Dockerfile Roast, the Dockerfile linter the droast pre-commit hook builds and runs.
+const Droast = "droast"
+
+// ShellCheck is the shell linter droast's required ShellCheck bridge (droast.toml) runs from PATH;
+// without it droast fails every Dockerfile, so a test driving droast looks up both.
+const ShellCheck = "shellcheck"
 
 // Tools is the closed list of tools a meta-test may be gated on.
-var Tools = []string{Hadolint}
+var Tools = []string{Droast, ShellCheck}
 
 // Lookup returns the path of tool, or skips the test when it is missing locally and fails it when
 // RequireEnv is set to 1. A tool outside Tools fails the test.

@@ -42,8 +42,9 @@ jobs:
       - name: Install pre-commit
         run: pip install --no-cache-dir pre-commit==4.6.2
 
-      - name: Set up hadolint
-        uses: ./.github/actions/setup-hadolint
+      # droast's ShellCheck bridge runs the shellcheck on PATH: the pinned one, not the runner's.
+      - name: Set up ShellCheck
+        uses: ./.github/actions/setup-shellcheck
 
       # Restore only: pre-commit-warmup.yaml saves the entry on main under the same key.
       - name: Restore the pre-commit cache
@@ -110,9 +111,9 @@ jobs:
         with:
           fetch-depth: 0
 
-      # The hadolint hook runs the system binary (language: system).
-      - name: Set up hadolint
-        uses: ./.github/actions/setup-hadolint
+      # droast's ShellCheck bridge runs the shellcheck on PATH: the pinned one, not the runner's.
+      - name: Set up ShellCheck
+        uses: ./.github/actions/setup-shellcheck
 
       - name: Run pre-commit hooks + reviewdog diff
         uses: leinardi/gha-pre-commit-reviewdog-actions/pre-commit-hooks@007919a45a04b0c52dfbb46732019dc4831fc03c # v1.0.3
@@ -129,7 +130,7 @@ jobs:
             check-toml
             check-added-large-files
             dclint
-            hadolint
+            droast
             golangci-lint-config-verify
             golangci-lint-fmt
             golangci-lint-full
@@ -251,8 +252,8 @@ jobs:
         run: bash .github/scripts/binary-attestation-status.test.sh
 
   # setup-go's built-in cache (keyed on go.sum) is enough at this size. ./... includes the
-  # meta-tests under test/; GOTILERT_REQUIRE_TOOLS=1 turns a missing hadolint from a skip into a
-  # failure (test/internal/toolgate).
+  # meta-tests under test/; GOTILERT_REQUIRE_TOOLS=1 turns a missing droast or shellcheck from a
+  # skip into a failure (test/internal/toolgate).
   go-test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -266,8 +267,13 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Set up hadolint
-        uses: ./.github/actions/setup-hadolint
+      # The label meta-test drives the droast release binary, the hook's rev.
+      - name: Set up droast
+        uses: ./.github/actions/setup-droast
+
+      # droast's ShellCheck bridge runs the shellcheck on PATH: the pinned one, not the runner's.
+      - name: Set up ShellCheck
+        uses: ./.github/actions/setup-shellcheck
 
       - name: Run unit tests with the race detector
         env:

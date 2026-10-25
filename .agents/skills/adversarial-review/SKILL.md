@@ -216,14 +216,15 @@ Do not skim for style. Run these passes, each with a "how would I make this fail
   as `fix`. A `revert` of a shipped `feat` or `fix` is itself a `fix` (`AGENTS.md`, "Commit
   messages").
 - **A meta-test that can no longer fail**: the packages under `test/` and the `scripts/check-*.sh`
-  hooks guard claims the code cannot check for itself (the Go line, the hadolint pin and label
-  schema, the image's posture, the licence headers, the suppression counts, the Markdown links, no
-  vacuous gate flags). Break the guarded thing once (move the Dockerfile's Go line, drop a label,
-  strip a header, add a `//nolint` without the baseline, add `|| true` to a recipe) and see whether
-  the test still fails. A check that passes because its file list is empty, its pattern no longer
-  matches anything, its loop never ran or its tool was skipped is a false pass: a finding. So is a
-  new tool lookup that bypasses `test/internal/toolgate`, and a scratch-repository git call without
-  `gitenv.Isolated()`, which under the commit hook writes into the real index.
+  hooks guard claims the code cannot check for itself (the Go line, the droast and ShellCheck pins,
+  the droast label schema, the image's posture, the licence headers, the suppression counts, the
+  Markdown links, no vacuous gate flags). Break the guarded thing once (move the Dockerfile's Go
+  line, drop a label, strip a header, add a `//nolint` without the baseline, add `|| true` to a
+  recipe) and see whether the test still fails. A check that passes because its file list is empty,
+  its pattern no longer matches anything, its loop never ran or its tool was skipped is a false
+  pass: a finding. So is a new tool lookup that bypasses `test/internal/toolgate`, and a
+  scratch-repository git call without `gitenv.Isolated()`, which under the commit hook writes into
+  the real index.
 
 For each candidate defect:
 
@@ -257,7 +258,7 @@ finding whatever the diff's stated intent was.
 
 ### (c) A new suppression has to show its work
 
-Any new `//nolint:`, `# shellcheck disable=` or `# hadolint ignore=` must explain why the fix does
+Any new `//nolint:`, `# shellcheck disable=` or `# droast ignore=` must explain why the fix does
 not apply: for a complexity rule, what broke when the extraction was tried; for `varnamelen`, why
 the name has to be short. A reason that restates the rule, or no reason, is a finding. So is a new
 exclusion in `.golangci.yaml`, and an exclusion, enable or setting there that matches nothing in
@@ -295,7 +296,7 @@ then run the gates the change owes and treat a failure it caused as a confirmed 
 | --- | --- |
 | any `**/*.go` | `make verify-go` (build, race tests, vet, golangci-lint), then `make check` |
 | `go.mod` / `go.sum` | `make go-tidy` and `make audit-deps` (govulncheck; network required) |
-| `deployments/docker/Dockerfile`, `.hadolint.yaml`, `.dockerignore` | `go test ./test/dockerfiles/ ./test/toolchain/`, hadolint via `make check`, plus `make docker-build` |
+| `deployments/docker/Dockerfile`, `droast.toml`, `.dockerignore` | `go test ./test/dockerfiles/ ./test/toolchain/`, droast via `make check`, plus `make docker-build` |
 | `test/**`, `scripts/check-*.sh`, `.suppressions-baseline` | `go test ./test/...`, plus the mutation from the meta-test pass in §4 |
 | `.github/scripts/**` | `bash .github/scripts/binary-attestation-status.test.sh` |
 | `.github/workflows/release.yaml` | actionlint via `make check`; only a release dry run exercises it end to end, so say which steps you could not run |

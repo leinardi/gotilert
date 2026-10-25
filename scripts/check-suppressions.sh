@@ -31,9 +31,9 @@
 # Two rules, and the second is the one that matters:
 #
 #   1. No count may exceed its baseline, and no rule may appear that the baseline does not know.
-#      Counts are per rule: one per nolint linter, and one per code for the shellcheck and hadolint
-#      directives. Deleting a suppression
-#      of one rule therefore cannot pay for adding a suppression of another.
+#      Counts are per rule: one per nolint linter, and one per code for the shellcheck and droast
+#      directives. Deleting a suppression of one rule therefore cannot pay for adding a suppression
+#      of another.
 #   2. A staged diff that adds a suppression line is refused unless the same commit also changes
 #      the baseline file. Rule 1 alone is blind to a swap within the same rule (delete one
 #      //nolint:gosec, add another), and the baseline file is the thing a reviewer reads.
@@ -45,7 +45,7 @@
 # file -- has to stage: those leave every count where it was, so without the stamp rule 2 would
 # refuse with nothing to change.
 #
-# These four families (nolint, shellcheck-disable, hadolint-ignore, hadolint-global-ignore) are the
+# These four families (nolint, shellcheck-disable, droast-ignore, droast-global-ignore) are the
 # in-file mechanisms of this repository's code linters. Others exist -- markdownlint-disable,
 # yamllint's disable-line, shellcheck directives inside workflow run: blocks -- and are not counted;
 # adding a file kind that has its own (a TypeScript file, an eslint directive) is the moment to add
@@ -209,9 +209,9 @@ FNR == 1 {
 	if (path ~ /Dockerfile$/) {
 		# The global form silences a rule for the whole file, so it is counted as its own family
 		# rather than folded in with the per-line one.
-		if (match(line, /#[ \t]*hadolint[ \t]+(global[ \t]+)?ignore=[A-Za-z0-9,]+/)) {
+		if (match(line, /#[ \t]*droast[ \t]+(global[ \t]+)?ignore=[A-Za-z0-9,]+/)) {
 			directive = substr(line, RSTART, RLENGTH)
-			family = (directive ~ /global/) ? "hadolint-global-ignore/" : "hadolint-ignore/"
+			family = (directive ~ /global/) ? "droast-global-ignore/" : "droast-ignore/"
 			sub(/^.*=/, "", directive)
 			count = split(directive, codes, ",")
 			for (i = 1; i <= count; i++) {

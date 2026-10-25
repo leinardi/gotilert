@@ -71,7 +71,7 @@ ARG VERSION="dev"
 ARG COMMIT="none"
 ARG DATE="unknown"
 
-# The seven OCI labels .hadolint.yaml requires (label-schema, strict-labels).
+# The seven OCI labels droast.toml requires (required-labels, strict-labels).
 LABEL org.opencontainers.image.title="gotilert" \
 	org.opencontainers.image.description="Gotify-compatible gateway that forwards notifications to Alertmanager" \
 	org.opencontainers.image.source="https://github.com/leinardi/gotilert" \
