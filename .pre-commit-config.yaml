@@ -33,7 +33,7 @@ repos:
         args: ["-oneline", "-shellcheck", "shellcheck -S error"]
         stages: [manual]
   - repo: https://github.com/DavidAnson/markdownlint-cli2
-    rev: v0.23.3
+    rev: v0.24.0
     hooks:
       - id: markdownlint-cli2
         additional_dependencies:
@@ -133,7 +133,7 @@ repos:
     hooks:
       - id: droast
   - repo: https://github.com/golangci/golangci-lint
-    rev: v2.14.0
+    rev: v2.15.0
     hooks:
       - id: golangci-lint-config-verify
       - id: golangci-lint-fmt
