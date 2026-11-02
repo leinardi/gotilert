@@ -33,7 +33,7 @@
 ########################
 # build: compile static binary
 ########################
-FROM --platform=$BUILDPLATFORM dhi.io/golang:1.26.9-alpine3.23-dev AS build
+FROM --platform=$BUILDPLATFORM dhi.io/golang:1.26.10-alpine3.23-dev AS build
 ARG VERSION="dev"
 ARG COMMIT="none"
 ARG DATE="unknown"
