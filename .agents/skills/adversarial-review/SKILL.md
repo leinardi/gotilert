@@ -258,9 +258,10 @@ have (under adversarial-review-loop, `verification.txt` when supplied, which is 
 claim and not proof; when invoked directly, the CI status or gate output in the PR or session) and
 what is missing, such as a `go.mod` change with no tidy or govulncheck result, a Dockerfile change
 with no image build or `test/dockerfiles` result, or a `release.yaml` change that only a release dry
-run exercises end to end. A failure in that evidence caused by the change is a confirmed finding.
-Never say that a check you did not see passed. Judge whether the change's tests prove it: a
-behaviour change needs a test that fails on the old code; a change to `test/**`,
+run exercises end to end. Judge what is missing against `AGENTS.md`'s *Validation matrix*: every
+changed path owes the checks its row names. A failure in that evidence caused by the change is a
+confirmed finding. Never say that a check you did not see passed. Judge whether the change's tests
+prove it: a behaviour change needs a test that fails on the old code; a change to `test/**`,
 `scripts/check-*.sh` or `.suppressions-baseline` needs the mutation from the meta-test pass shown to
 make the check fail. The `*_integration_test.go` files are ordinary tests against `httptest`
 servers, with no build tag. When invoked directly, one focused test (`go test ./internal/server -run
