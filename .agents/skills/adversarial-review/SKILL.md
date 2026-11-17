@@ -19,53 +19,28 @@ breaks an invariant, or drifts from a contract. Your job is to find the specific
 path where it fails — not to praise it, not to restyle it. A review that finds nothing is only
 credible after you have actively tried to break the code and failed.
 
-Copy this checklist and tick items as you go:
+## Scope
 
-```text
-Review progress:
-- [ ] 1. Scope chosen; diff, stated intent and every changed file read in full
-- [ ] 2. `go-style-guide` loaded for the Go paths
-- [ ] 3. Repo invariants checked
-- [ ] 4. Adversarial passes run; every candidate confirmed or dropped
-- [ ] 5. Always-on passes (a)–(e) run
-- [ ] 6. Gates run; `git status` checked for hook rewrites; skipped gates marked unverified
-- [ ] 7. Report written: findings, open questions, verdict, gates run and not run
-```
+When invoked directly: review the scope the user gives (`gh pr view <n>` for intent, then `gh pr
+diff <n>`); with none, the uncommitted work (`git diff HEAD` plus untracked files, which no diff
+shows); on a clean tree, `git diff main...HEAD`. Never review from a description of the change.
 
----
+Read the stated **intent** (`git log --oneline` for the range, any linked issue or PR body): a
+change that works but does something other than what it claims is a finding. Read every changed
+file in full, not just the hunks, and for non-trivial changes the callers, implementations, tests
+and docs of what changed, found with a reference search, not assumed from the diff: a signature or
+behavior change is only safe if every call site agrees.
 
-## 1. Establish the diff (what am I reviewing?)
-
-Never review from memory or from the user's description of the change — read the actual diff. Pick
-the scope from what the user said:
-
-| User intent | Command |
-| --- | --- |
-| "my work" / "before I commit" / uncommitted | `git status --short`, then `git diff HEAD`; read untracked files too, which no diff shows |
-| staged changes only | `git diff --staged` |
-| a branch / "this PR" / "ready to merge" | `git diff main...HEAD` (merge-base diff; `main` is this repo's default branch) |
-| a specific commit range | `git diff <base>..<head>` |
-| a GitHub PR number | `gh pr view <n>` for intent, then `gh pr diff <n>` |
-
-If the user names no scope, review the uncommitted work (first row); if the tree is clean, review
-the branch against `main` (third row).
-
-Also read `git log --oneline` for the range and any linked issue/PR body — the stated **intent** is
-what you check the code against. A change that works but does something other than what it claims is
-a finding.
-
-Read every changed file in full, not just the hunks. For non-trivial changes, also read the callers,
-implementations, tests and docs of what changed — found with a reference search, not assumed from
-the diff: a signature or behavior change is only safe if every call site agrees.
-
-## 2. Load the domain skill
+## Authority
 
 For any `**/*.go` path, load `go-style-guide` before judging it; its rules are findings even when
 lint is green. Every other path (Dockerfile, compose, `Makefile`, `.mk/*.mk`, workflows, other YAML,
-bash, Markdown) gets the passes in §4 plus the invariants in §3 with the **same rigor** — an
+bash, Markdown) gets the passes below plus the invariants with the **same rigor** — an
 unmatched language is not a lighter review.
 
-## 3. Repo invariants — check these on every review, whatever changed
+## Repository invariants
+
+Check these on every review, whatever changed.
 
 These are the ways this gateway breaks that generic reviewers miss.
 
@@ -189,32 +164,27 @@ cardinality finding.
 - Trivy exceptions live only in `.trivyignore`, each with a reason and an `exp:` date.
 - Every workflow starts at `permissions: contents: read`; a job asks for more only with a comment
   saying why. Actions are pinned to a full commit SHA, images to a digest.
-- The commit type decides the release bump (`svu`): check that it matches whether the change should
-  ship.
+- **Commit type matches whether it ships.** `svu` derives the release from the commit types since
+  the last tag, and pull requests land as merge commits, so every commit counts, not just the
+  title. A change users should receive in the binary or the image (behavior, a security or
+  dependency fix, a performance gain), typed `chore`, `docs`, `refactor`, `perf` or `build`, never
+  ships on its own: a finding. So is a `feat`/`fix` on a change nobody receives (CI, docs, tests,
+  tooling), which cuts a release with nothing in it; a stray `!` or `BREAKING CHANGE:` footer,
+  which cuts a major; and a subject with a word ending in `feat` or `fix` right before a colon
+  (`prefix:`), which `svu` counts as `fix`. A `revert` of a shipped `feat` or `fix` is itself a
+  `fix` (`AGENTS.md`, "Commit messages").
 
-## 4. Adversarial passes — language-agnostic
+## Adversarial passes
 
-Do not skim for style. Run these passes, each with a "how would I make this fail" framing:
+Beyond the generic passes (logic, nil and empty input, aliasing, error handling, concurrency,
+resources, security), run these with a "how would I make this fail" framing, and name one
+concrete failing input per candidate rather than asserting "looks fine".
 
-- **Generic passes**: correctness and logic, boundaries and nil/empty, aliasing, error handling,
-  concurrency, resources and security. For each, name one concrete failing input and trace it end to
-  end rather than asserting "looks fine".
-- **Contract drift**: does the code do what the commit message / PR / issue claims? A public
-  signature, flag, config key, label, annotation, endpoint, status code or error text changed
-  without updating every consumer and the docs (§5 (e)).
-- **Tests**: does the diff add or change a test for the behavior it introduces? A test that passes
-  against the *old* code, that asserts on a fake's recorded calls instead of the behavior they
-  produced, or that was weakened/deleted to make the change pass — all findings. A bug fix with no
-  regression test is a gap worth flagging.
-- **Commit type matches whether it ships**: `svu` derives the release from the commit types since
-  the last tag, and pull requests land as merge commits, so every commit counts, not just the title.
-  A change users should receive in the binary or the image (behavior, a security or dependency fix,
-  a performance gain), typed `chore`, `docs`, `refactor`, `perf` or `build`, never ships on its own:
-  a finding. So is a `feat`/`fix` on a change nobody receives (CI, docs, tests, tooling), which cuts
-  a release with nothing in it; a stray `!` or `BREAKING CHANGE:` footer, which cuts a major; and a
-  subject with a word ending in `feat` or `fix` right before a colon (`prefix:`), which `svu` counts
-  as `fix`. A `revert` of a shipped `feat` or `fix` is itself a `fix` (`AGENTS.md`, "Commit
-  messages").
+- **Contract drift**: a public signature, flag, config key, label, annotation, endpoint, status
+  code or error text changed without updating every consumer and the docs (*Docs drift* below).
+- **Tests**: a test that passes against the *old* code, that asserts on a fake's recorded calls
+  instead of the behavior they produced, or that was weakened or deleted to make the change pass
+  is a finding. A bug fix with no regression test is a gap worth flagging.
 - **A meta-test that can no longer fail**: the packages under `test/` and the `scripts/check-*.sh`
   hooks guard claims the code cannot check for itself (the Go line, the droast and ShellCheck pins,
   the droast label schema, the image's posture, the licence headers, the suppression counts, the
@@ -226,15 +196,7 @@ Do not skim for style. Run these passes, each with a "how would I make this fail
   scratch-repository git call without `gitenv.Isolated()`, which under the commit hook writes into
   the real index.
 
-For each candidate defect:
-
-1. Reproduce it with a focused test, or trace one concrete input through the code to the wrong
-   result.
-2. Confirmed: it is a finding. Record the input and the wrong behavior.
-3. Not confirmed: dig once more (callers, tests, config path). Still not confirmed: drop it. A vague
-   "consider" is not a finding.
-
-## 5. Always-on passes
+## Always-on passes
 
 These run on **every** review, whatever changed.
 
@@ -242,7 +204,7 @@ These run on **every** review, whatever changed.
 
 Ask: does this change create a new place where something from outside becomes work or output — a
 request value that becomes a label, an upstream call, a log field or a response body; a config value
-that changes auth or TLS? If it does, walk the §3 authentication, forwarding, TLS and metrics items
+that changes auth or TLS? If it does, walk the authentication, forwarding, TLS and metrics invariants
 against it.
 
 ### (b) Deletion smell
@@ -287,28 +249,27 @@ metrics, route and method labels).
 A surface the code has and the docs do not mention is a finding; so is a documented one nothing
 implements, and a default in the docs that differs from the code.
 
-## 6. Verify before you trust (don't hand-wave the gates)
+## Gates
 
-Use focused tests while investigating (`go test ./internal/server -run TestAuthTokenPrecedence -v`),
-then run the gates the change owes and treat a failure it caused as a confirmed finding:
+Do not re-run the repository's gates (`make verify-go`, `make check`, `make go-tidy`, `make
+audit-deps`, `make docker-build`, `go test ./test/...`). The implementer is expected to run them and
+CI runs them again, but do not assume either happened: report the verification evidence you actually
+have (under adversarial-review-loop, `verification.txt` when supplied, which is the implementer's
+claim and not proof; when invoked directly, the CI status or gate output in the PR or session) and
+what is missing, such as a `go.mod` change with no tidy or govulncheck result, a Dockerfile change
+with no image build or `test/dockerfiles` result, or a `release.yaml` change that only a release dry
+run exercises end to end. Judge what is missing against `AGENTS.md`'s *Validation matrix*: every
+changed path owes the checks its row names. A failure in that evidence caused by the change is a
+confirmed finding. Never say that a check you did not see passed. Judge whether the change's tests
+prove it: a behaviour change needs a test that fails on the old code; a change to `test/**`,
+`scripts/check-*.sh` or `.suppressions-baseline` needs the mutation from the meta-test pass shown to
+make the check fail. The `*_integration_test.go` files are ordinary tests against `httptest`
+servers, with no build tag. When invoked directly, one focused test (`go test ./internal/server -run
+TestAuthTokenPrecedence -v`) may be run to confirm a single suspected finding, never a full suite or
+gate. A candidate that is neither reproduced nor traced end to end is dropped: a vague "consider" is
+not a finding.
 
-| Diff touched | Run |
-| --- | --- |
-| any `**/*.go` | `make verify-go` (build, race tests, vet, golangci-lint), then `make check` |
-| `go.mod` / `go.sum` | `make go-tidy` and `make audit-deps` (govulncheck; network required) |
-| `deployments/docker/Dockerfile`, `droast.toml`, `.dockerignore` | `go test ./test/dockerfiles/ ./test/toolchain/`, droast via `make check`, plus `make docker-build` |
-| `test/**`, `scripts/check-*.sh`, `.suppressions-baseline` | `go test ./test/...`, plus the mutation from the meta-test pass in §4 |
-| `.github/scripts/**` | `bash .github/scripts/binary-attestation-status.test.sh` |
-| `.github/workflows/release.yaml` | actionlint via `make check`; only a release dry run exercises it end to end, so say which steps you could not run |
-| anything else | `make check` (pre-commit on all files) |
-
-The `*_integration_test.go` files are ordinary tests against `httptest` servers, with no build tag:
-`make go-test` runs them. golangci-lint may not be on `PATH`; run it through pre-commit. Several
-hooks rewrite files (prettier, markdownlint, the golangci formatters): check `git status` afterwards
-and report a rewrite as a finding. If a gate is impractical here (no Docker, no network for
-govulncheck), say so and mark that risk unverified.
-
-## 7. Report
+## Report
 
 Rank by severity, worst first. An authentication bypass, a leaked token or credential, or an
 unbounded upstream wait is normally **critical**. Skip pure formatting the linters already catch
@@ -321,6 +282,6 @@ unless it changes meaning or breaks a required gate. For each finding:
 ```
 
 Findings first, then open questions or assumptions, then a one-line verdict: **block**, **approve
-with nits**, or **approve** — plus which verification gates you actually ran and which you couldn't.
-If you found nothing, state what you tried to break so the "no findings" is credible. Be blunt; do
-not soften a real defect to be polite, and do not invent findings to look thorough.
+with nits**, or **approve**, and one line: `Verification evidence: seen … / missing …`. If you
+found nothing, state what you tried to break so the "no findings" is credible. Be blunt; do not
+soften a real defect to be polite, and do not invent findings to look thorough.
